@@ -1,8 +1,12 @@
+#!/usr/bin/env python
+
 """
 Author: Aleksa Zatezalo
+Version: 1.0
 Date: October 2024
-Description: A repository of ASCII Art for GrapeQL.
+Description: ASCII Art and 'graphics' for GrapeQL. 
 """
+
 
 class color:
    PURPLE = '\033[95m'
