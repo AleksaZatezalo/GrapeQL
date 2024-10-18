@@ -72,13 +72,24 @@ def printMsg(message, status="log"):
     """
     Prints various types of logs to standard output.
     """
-    if (status == "success"):
-        pass
-    if (status == "warning"):
-        pass
-    if (status == "failed"):
-        pass
-    if (status == "log"):
-        pass
+    
+    plus = "[+] "
+    exclaim ="[!] "
+    fail = "[-] "
+
+    match status:
+        case "success":
+            print(color.GREEN + plus + message + color.END)
+        case "warning":
+            print(color.YELLOW + exclaim + message + color.END)
+        case "failed":
+            print(color.RED + fail + message + color.END)
+        case "log":
+            print(color.CYAN + exclaim + message + color.END)
 
 intro()
+message = "Hello, World!"
+printMsg(message, status="success")
+printMsg(message, status="warning")
+printMsg(message, status="failed")
+printMsg(message, status="log")
