@@ -50,23 +50,14 @@ def printWelcome():
     Prints a welcome message in purple color to standard output. 
     """
     
-    msg = "Welcome to GrapeQL, the GraphQL vuln scanner.\nType `help` to see your options.\n"
+    msg = "Welcome to GrapeQL, the GraphQL vuln scanner.For more infor type " + color.BOLD + "`help`.\n"
     print(color.PURPLE +  msg + color.END)
 
 def printPrompt():
     """
     Prints a prompt in purple to standard output.
     """
-    print(color.PURPLE +  "[GrapeQL] >" + color.END)
-
-def intro():
-    """
-    Prints the introductory banner and prompt to standard output.
-    """
-    printGrapes()
-    printTitle()
-    printWelcome()
-    printPrompt()
+    print(color.PURPLE +  "\n[GrapeQL] >" + color.END)
 
 def printMsg(message, status="log"):
     """
@@ -87,9 +78,27 @@ def printMsg(message, status="log"):
         case "log":
             print(color.CYAN + exclaim + message + color.END)
 
+def printNotify():
+    """
+    Prints messages about notifications and logs. 
+    """
+
+    print(color.BOLD + "EXAMPLE NOTIFICATIONS: " + color.END)
+    printMsg("Warnings are printed like this.", status="warning")
+    printMsg("Errors are printed like this.", status="failed")
+    printMsg("Good news is printed like this.", status="success")
+    printMsg("Logs are printed like this\n.", status="log")
+
+def intro():
+    """
+    Prints the introductory banner and prompt to standard output.
+    """
+    printGrapes()
+    printTitle()
+    printWelcome()
+    printNotify()
+    printPrompt()
+
+
+
 intro()
-message = "Hello, World!"
-printMsg(message, status="success")
-printMsg(message, status="warning")
-printMsg(message, status="failed")
-printMsg(message, status="log")
