@@ -1,5 +1,7 @@
 # GrapeQL
 
+GrapeQL is an automated pwn tool and vulnerability scanner for GraphQL. The tool is meant to functions similar to SQLMap in that it automatically tests for many vulnerabilities in GrapQL APIs via CLIs.
+
 ## Technical Overiview
 
 ## Usage Instructions
