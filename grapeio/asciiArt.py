@@ -98,7 +98,3 @@ def intro():
     printWelcome()
     printNotify()
     printPrompt()
-
-
-
-intro()
