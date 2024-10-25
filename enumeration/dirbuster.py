@@ -30,3 +30,14 @@ def wordListScan(url, wordListPath):
     with open(wordListPath) as file:
         while line := file.readline():
             dirb(url, line.rstrip())
+
+def promptBust():
+    """
+    Has the user pass details for a directory bust via standard output.
+    """
+
+    target_hosts = input("Enter the host url: ")
+    wordlist = (input("Enter the location of your wordlist: "))
+    wordListScan(target_hosts, wordlist)
+
+promptBust()
