@@ -44,6 +44,10 @@ def scan_ports(host, start_port, end_port):
         scanPort(host, port)   
         
 def promptScan():
+    """
+    Prompts the user to enter scan details using standard input and standard output.
+    """
+    
     target_hosts = input("Enter the host IP address: ")
     start_port = int(input("Enter the starting port: "))
     end_port = int(input("Enter the ending port: "))
