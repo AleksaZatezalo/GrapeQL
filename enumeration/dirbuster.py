@@ -39,5 +39,3 @@ def promptBust():
     target_hosts = input("Enter the host url: ")
     wordlist = (input("Enter the location of your wordlist: "))
     wordListScan(target_hosts, wordlist)
-
-promptBust()
