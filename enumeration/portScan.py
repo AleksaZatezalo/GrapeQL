@@ -48,4 +48,3 @@ def promptScan():
     start_port = int(input("Enter the starting port: "))
     end_port = int(input("Enter the ending port: "))
     scan_ports(target_hosts, start_port, end_port)
-

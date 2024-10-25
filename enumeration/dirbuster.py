@@ -10,6 +10,9 @@ Description: A simple implementation of dirbuster.
 import requests
 
 def dirb(url, path):
+    """
+    Constructs a new path based on URL and Path. Scans the newly constructed URL\Path. 
+    """
     try:
         path = url + "/" + path
         r = requests.get(path)
@@ -18,7 +21,12 @@ def dirb(url, path):
     except:
        pass
 
-def wordListScan(url, wordlistPath):
-    with open(wordlistPath) as file:
+def wordListScan(url, wordListPath):
+    """
+    Takes a URL ,url, and a word list containing directory names, wordListPath.
+    It scans a serise of urls by combing url and wordListPath.
+    """
+
+    with open(wordListPath) as file:
         while line := file.readline():
             dirb(url, line.rstrip())
