@@ -2,8 +2,8 @@
 
 """
 Author: Aleksa Zatezalo
-Version: 0.0
-Date: 
+Version: 1.0
+Date: October 2024
 Description: A simple implementation of dirbuster.
 """
 
