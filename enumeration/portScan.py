@@ -23,7 +23,7 @@ def scanPort(host, port):
     sock.close()
     return result
 
-def scan_ports(host, start_port, end_port):
+def scanPortsMinMax(host, start_port, end_port):
     """
     Takes a string representing a url called host, and two integers called start_port and end_port.
     It scans the ports on host from start_port to end_port.
@@ -36,12 +36,15 @@ def scan_ports(host, start_port, end_port):
     
     return ports
 
-def promptScan():
+def scanPortArray(host, portArray):
     """
-    Prompts the user to enter scan details using standard input and standard output.
+    Takes a string representing a url called host, and two integers called start_port and end_port.
+    It scans the ports on host from start_port to end_port.
     """
+    ports = []
+    print(f"Scanning ports on {host}...")
+    for port in portArray:
+        if (scanPort(host, port) == 0):
+            ports.append(port)   
     
-    target_hosts = input("Enter the host IP address: ")
-    start_port = int(input("Enter the starting port: "))
-    end_port = int(input("Enter the ending port: "))
-    print(scan_ports(target_hosts, start_port, end_port))
+    return ports

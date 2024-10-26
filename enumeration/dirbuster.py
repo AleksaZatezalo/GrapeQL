@@ -34,12 +34,3 @@ def wordListScan(url, wordListPath):
            if result != None:
                urls.append(result)
     return urls
-
-def promptBust():
-    """
-    Has the user pass details for a directory bust via standard output.
-    """
-
-    target_hosts = input("Enter the host url: ")
-    wordlist = (input("Enter the location of your wordlist: "))
-    return wordListScan(target_hosts, wordlist)
