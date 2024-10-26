@@ -17,9 +17,9 @@ def dirb(url, path):
         path = url + "/" + path
         r = requests.get(path)
         if r.status_code == 200:
-            print("\033[93m" + f"[!] {path} Found" + "\033[0m")
+           return path
     except:
-       pass
+       return None
 
 def wordListScan(url, wordListPath):
     """
@@ -27,9 +27,13 @@ def wordListScan(url, wordListPath):
     It scans a serise of urls by combing url and wordListPath.
     """
 
+    urls = []
     with open(wordListPath) as file:
         while line := file.readline():
-            dirb(url, line.rstrip())
+           result =  dirb(url, line.rstrip())
+           if result != None:
+               urls.append(result)
+    return urls
 
 def promptBust():
     """
@@ -38,4 +42,4 @@ def promptBust():
 
     target_hosts = input("Enter the host url: ")
     wordlist = (input("Enter the location of your wordlist: "))
-    wordListScan(target_hosts, wordlist)
+    return wordListScan(target_hosts, wordlist)
