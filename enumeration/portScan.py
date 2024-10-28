@@ -11,9 +11,14 @@ import sys
 import socket
 import asyncio
 
-async def test_port_number(host, port, timeout=3):
-    coro = asyncio.open_connection(host, port)
+async def testPort(host, port, timeout=3):
+    """
+    Asyncronus function that takes a string representing a host, host,
+    an integer representing a port, port, and an int representing timeout.
+    It connects to a port and returns a bool representing if it is open.
+    """
 
+    coro = asyncio.open_connection(host, port)
     try:
         _, writer = await asyncio.wait_for(coro, timeout)
         writer.close()
@@ -21,19 +26,18 @@ async def test_port_number(host, port, timeout=3):
     except:
         return False
     
-async def port_scan(host, ports):
+async def portScan(host, ports):
+    """
+    Asyncronus function that takes a string representing a host, host,
+    an array of integers representing a list of ports, ports.
+    It returns an array of open ports from the list ports, on host.
+    """
+    
     print(f'Scanning {host}...')
     items = []
-    coros = [test_port_number(host, port) for port in ports]
+    coros = [testPort(host, port) for port in ports]
     results = await asyncio.gather(*coros)
     for port, result in zip(ports, results):
         if result :
             items.append(f'{host}:{port} [OPEN]')
     return items
-
-# # define a host and ports to scan
-# host = '34.227.60.98'
-# ports = range(1, 1024)
-# # start the asyncio program
-# thing = asyncio.run(port_scan(host, ports))
-# print(thing)

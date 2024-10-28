@@ -21,7 +21,7 @@ def dirb(url, path):
     except:
        return None
 
-def wordListScan(url, wordListPath):
+async def wordListScan(url, wordListPath):
     """
     Takes a URL ,url, and a word list containing directory names, wordListPath.
     It scans a serise of urls by combing url and wordListPath.
