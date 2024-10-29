@@ -8,7 +8,7 @@ Description: An basic web enumeration tool for GrapeQL.
 """
 
 from ..grapeio.grapeio import printMsg
-
+import portScan
 
 def printDirBust(results):
     """
@@ -38,7 +38,12 @@ def executePortScan(host, portList=None):
     """
     Executes a nmap style scan on the supplied host. Uses default portlist 
     unless otherwise specified.
-
     """
     
-    pass
+    ports = [21, 22, 25, 80, 443, 3000, 8000, 8008, 8080, 8888, 9000, 9009, 27017]
+    if portList:
+       items = portScan(host, portList)
+    else:
+       items = portScan(host, ports)
+       
+    printPortScan(items)
