@@ -7,6 +7,9 @@ Date: October 2024
 Description: An basic web enumeration tool for GrapeQL.
 """
 
+from ..grapeio.grapeio import printMsg
+
+
 def printDirBust(results):
     """
     """
@@ -17,19 +20,8 @@ def printPortScan(results):
     """
     """
 
-    pass
-
-def promptDirBust():
-    """
-    """
-    
-    pass
-
-def promptPortScan():
-    """
-    """
-    
-    pass
+    for port in results:
+        printMsg(f'Port {port} open on Host. \n')
 
 def executeDirBust():
     """
@@ -42,3 +34,6 @@ def executePortScan():
     """
     
     pass
+
+
+printPortScan([10, 22, 25, 80])
