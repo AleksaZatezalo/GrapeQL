@@ -12,45 +12,69 @@ import socket
 import asyncio
 import time
 
-async def testPort(host, port, timeout=3):
-    """
-    Asyncronus function that takes a string representing a host, host,
-    an integer representing a port, port, and an int representing timeout.
-    It connects to a port and returns a bool representing if it is open.
-    """
+async def test_port_number(host, port, timeout=1):
 
-    coro = asyncio.open_connection(host, port)
     try:
-        _, writer = await asyncio.wait_for(coro, timeout)
+        # Attempt to open a connection with a timeout
+        _, writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout)
+        # Close the connection
         writer.close()
         return True
-    except:
+    except (asyncio.TimeoutError, ConnectionRefusedError):
         return False
+
     
-async def portScan(host, ports):
+async def scanPorts(host, task_queue, open_ports):
+
+    # read tasks forever
+    while True:
+        # Get a port to scan from the queue
+        port = await task_queue.get()
+        if port is None:
+            # Add the termination signal back for other workers
+            await task_queue.put(None)
+            task_queue.task_done()
+            break
+        if await test_port_number(host, port):
+            print(f'{host}:{port} [OPEN]')
+            open_ports.append(port)
+        task_queue.task_done()
+
+
+async def scanIP(limit=100, host="127.0.0.1", portsToScan=[21, 22, 80, 139, 443, 445, 3000, 4000, 8000, 8080]):
+    task_queue = asyncio.Queue()
+    open_ports = []
+
+    # Start the port scanning coroutines
+    workers = [
+        asyncio.create_task(scanPorts(host, task_queue, open_ports))
+        for _ in range(limit)
+    ]
+
+    # Add ports to the task queue
+    for port in portsToScan:
+        await task_queue.put(port)
+
+    # Wait for all tasks to be processed
+    await task_queue.join()
+
+    # Signal termination to workers
+    await task_queue.put(None)
+    await asyncio.gather(*workers)
+
+    return open_ports
+
+
+async def main():
     """
-    Asyncronus function that takes a string representing a host, host,
-    an array of integers representing a list of ports, ports.
-    It returns an array of open ports from the list ports, on host.
+    Main function to take user input for IP address and scan ports.
     """
-    
-    print(f'Scanning {host}...')
-    items = []
-    coros = [testPort(host, port) for port in ports]
-    results = await asyncio.gather(*coros)
-    for port, result in zip(ports, results):
-        if result :
-            items.append(f'{host}:{port} [OPEN]')
-    return items
 
+    # # Get IP address from the user
+    ip = input("Enter the target IP address: ")
+    print("\nScanning for open ports.")
+    openPorts = await scanIP(host=ip)
 
-# async def main():
-#     host = "195.177.199.39"  # Replace with the target host
-#     port_range = (0, 65535)  # Example range of ports
-#     open_ports = await portScan(host, port_range)
-#     time.sleep(2)
-#     print(open_ports)
-
-# # Run the main function
-# if __name__ == "__main__":
-#     asyncio.run(main())
+# Run the script
+if __name__ == "__main__":
+    asyncio.run(main())
