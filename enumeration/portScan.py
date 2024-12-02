@@ -10,6 +10,7 @@ Description: An async tcp port scanner.
 import sys
 import socket
 import asyncio
+import time
 
 async def testPort(host, port, timeout=3):
     """
@@ -41,3 +42,15 @@ async def portScan(host, ports):
         if result :
             items.append(f'{host}:{port} [OPEN]')
     return items
+
+
+# async def main():
+#     host = "195.177.199.39"  # Replace with the target host
+#     port_range = (0, 65535)  # Example range of ports
+#     open_ports = await portScan(host, port_range)
+#     time.sleep(2)
+#     print(open_ports)
+
+# # Run the main function
+# if __name__ == "__main__":
+#     asyncio.run(main())
