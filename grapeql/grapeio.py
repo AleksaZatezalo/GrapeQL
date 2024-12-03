@@ -32,8 +32,8 @@ def printGrapes():
     print(color.PURPLE + color.BOLD +  """
               __
         __ {_/  
-       \_}\\ _
-          _\(_)_  
+       \\_}\\ _
+          _\\(_)_  
          (_)_)(_)_
         (_)(_)_)(_)
          (_)(_))_)
@@ -146,13 +146,13 @@ async def main():
     # Get IP and URL from the user
     ip = input("Enter the IP address to scan ports (e.g., 127.0.0.1): ").strip()
 
-    print("\nStarting port scan...")
+    printMsg("Starting port scan...")
     # Perform port scanning
     open_ports = await scanIP(host=ip)
     if open_ports:
-        print(f"\nOpen ports on {ip}: {open_ports}")
+        pass
     else:
-        print(f"\nNo open ports found on {ip}.")
+        printMsg(f"No open ports found on {ip}.", status="warning")
 
     url = input("Enter the URL to scan endpoints (e.g., http://127.0.0.1:8080): ").strip()
     print("\nStarting endpoint scan...")
