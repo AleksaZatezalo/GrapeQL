@@ -41,9 +41,11 @@ async def scanPorts(host, task_queue, open_ports):
         task_queue.task_done()
 
 
-async def scanIP(limit=100, host="127.0.0.1", portsToScan=[21, 22, 80, 139, 443, 445, 3000, 4000, 8000, 8080]):
+async def scanIP(limit=100, host="127.0.0.1"):
     task_queue = asyncio.Queue()
     open_ports = []
+
+    portsToScan=range(1,65535)
 
     # Start the port scanning coroutines
     workers = [
@@ -63,18 +65,3 @@ async def scanIP(limit=100, host="127.0.0.1", portsToScan=[21, 22, 80, 139, 443,
     await asyncio.gather(*workers)
 
     return open_ports
-
-
-async def main():
-    """
-    Main function to take user input for IP address and scan ports.
-    """
-
-    # # Get IP address from the user
-    ip = input("Enter the target IP address: ")
-    print("\nScanning for open ports.")
-    openPorts = await scanIP(host=ip)
-
-# Run the script
-if __name__ == "__main__":
-    asyncio.run(main())
