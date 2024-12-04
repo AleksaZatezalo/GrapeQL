@@ -9,8 +9,7 @@ Description: ASCII Art and 'graphics' for GrapeQL.
 
 import time
 import asyncio
-from portScan import scanIP
-from dirBuster import scanEndpoints
+from endpointEnum import findEndpoints
 
 class color:
    PURPLE = '\033[95m'
@@ -146,22 +145,8 @@ async def main():
     # Get IP and URL from the user
     ip = input("Enter the IP address to scan ports (e.g., 127.0.0.1): ").strip()
 
-    printMsg("Starting port scan...")
-    # Perform port scanning
-    open_ports = await scanIP(host=ip)
-    if open_ports:
-        pass
-    else:
-        printMsg(f"No open ports found on {ip}.", status="warning")
-
-    url = input("Enter the URL to scan endpoints (e.g., http://127.0.0.1:8080): ").strip()
-    print("\nStarting endpoint scan...")
-    # Perform endpoint scanning
-    valid_endpoints = await scanEndpoints(base_url=url)
-    if valid_endpoints:
-        print(f"\nValid endpoints on {url}: {valid_endpoints}")
-    else:
-        print(f"\nNo valid endpoints found on {url}.")
+    printMsg("Finding GraphQL Endpoints...")
+    
 
 # Example usage
 if __name__ == "__main__":
