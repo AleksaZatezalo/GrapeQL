@@ -6,6 +6,8 @@ GrapeQL is an automated pwn tool and vulnerability scanner for GraphQL. The tool
 
 ## Usage Instructions
 
+### Download and Install
+
 ## Contribution Guidelines
 
 When contributing to this repository, please first discuss the change you wish to make via issue here on GitHub. Make sure all pull requests are tagged with a specific ticket number found in the repositories issues section.Before making any changes please create your own branch. Follow all three points below before opening a PR:
@@ -16,6 +18,8 @@ When contributing to this repository, please first discuss the change you wish t
 4. Update the README.md with details of changes to the interface, this includes new environment variables, exposed ports, useful file locations and container parameters.
 
 Note that we have a code of conduct. Follow it in all your interactions with the project.
+
+### Folder Structure 
 
 ## Known Issues
 
