@@ -253,16 +253,6 @@ We welcome contributions to GrapeQL! Please follow these steps:
 ## License
 GrapeQL is licensed under the MIT License. See LICENSE file for details.
 
-## Acknowledgments
-- GraphQL Foundation
-- Security researchers and contributors
-- Open source community
-
-## Support
-- GitHub Issues: [Link to Issues]
-- Documentation: [Link to Docs]
-- Security Contact: security@grapeql.org
-
 ## A Note on Responsible Testing
 GrapeQL is a powerful testing tool. Always ensure you have explicit permission to test target systems and use the tool responsibly.
 
