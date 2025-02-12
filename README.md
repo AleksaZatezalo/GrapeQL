@@ -1,4 +1,5 @@
 # 🍇 GrapeQL: The GraphQL Security Testing Suite
+
 Version: 1.0
 Last Updated: January 2025
 
@@ -17,11 +18,13 @@ GrapeQL is a comprehensive GraphQL security assessment toolkit designed to help 
 ## Features
 
 ### 1. Endpoint Harvesting (The Vine)
+
 - Automated port scanning
 - Automated GraphQL endpoint discovery
 - Common endpoint path enumeration
 
 ### 2. Schema Analysis (The Root)
+
 - Introspection query testing
 - Schema validation and analysis
 - Deprecated field detection
@@ -30,6 +33,7 @@ GrapeQL is a comprehensive GraphQL security assessment toolkit designed to help 
 - Schema drift detection
 
 ### 3. Authentication Testing (The Guard)
+
 - Authentication bypass detection
 - Token validation and testing
 - Session management analysis
@@ -37,6 +41,7 @@ GrapeQL is a comprehensive GraphQL security assessment toolkit designed to help 
 - OAuth 2.0 and JWT validation
 
 ### 4. Query Testing (The Juice)
+
 - Nested query vulnerability detection
 - Circular fragment testing
 - Field duplication attacks
@@ -46,6 +51,7 @@ GrapeQL is a comprehensive GraphQL security assessment toolkit designed to help 
 - Operation name validation
 
 ### 5. Mutation Testing (The Seeds)
+
 - Input validation testing
 - File upload vulnerability testing
 - SQL injection via mutations
@@ -54,6 +60,7 @@ GrapeQL is a comprehensive GraphQL security assessment toolkit designed to help 
 - Mass assignment vulnerability testing
 
 ### 6. DoS Protection Testing (The Crush)
+
 - Rate limiting validation
 - Query depth analysis
 - Cost analysis
@@ -64,6 +71,7 @@ GrapeQL is a comprehensive GraphQL security assessment toolkit designed to help 
 ## Installation
 
 ### Prerequisites
+
 ```bash
 # Required
 Python 3.7+
@@ -75,125 +83,22 @@ Burp Suite (for proxy integration)
 ```
 
 ### Basic Installation
+
 ```bash
 pip install grapeql
 ```
 
 ### Development Installation
+
 ```bash
-git clone https://github.com/your-repo/grapeql
+git clone https://github.com/AleksaZatezalo/grapeql
 cd grapeql
-pip install -e ".[dev]"
-```
-
-## Usage
-
-### Quick Start
-```bash
-grapeql http://target.com/graphql
-```
-
-### Advanced Usage
-```bash
-grapeql http://target.com/graphql \
-  --auth-token "Bearer token" \
-  --depth 15 \
-  --rate-limit 100 \
-  --proxy http://localhost:8080 \
-  --output report.json \
-  --modules all
-```
-
-### Command Line Arguments
-```
-Required Arguments:
-  url                   GraphQL endpoint URL
-
-Optional Arguments:
-  --auth-token          Authorization token
-  --depth               Maximum query depth (default: 10)
-  --rate-limit          Requests per second (default: 50)
-  --proxy               Proxy URL for requests
-  --output              Output file path
-  --timeout             Request timeout in seconds
-  --verbose             Enable verbose output
-  --no-introspection    Skip introspection queries
-  --custom-headers      Add custom HTTP headers
-  --modules             Specify modules to run (comma-separated)
-```
-
-## Test Modules
-
-### Authentication and Authorization (auth)
-```graphql
-# Example test for unauthorized access
-query unauthorized {
-  sensitiveData {
-    id
-    content
-  }
-}
-```
-
-### Query Depth Testing (depth)
-```graphql
-# Example of nested query test
-query deep {
-  user {
-    friends {
-      friends {
-        # Continues nesting...
-      }
-    }
-  }
-}
-```
-
-### Data Exposure (exposure)
-```graphql
-# Example of field exposure test
-query exposure {
-  users {
-    id
-    email
-    password
-    internalNotes
-  }
-}
-```
-
-## Output Format
-
-### JSON Format
-```json
-{
-  "scan_info": {
-    "target": "http://example.com/graphql",
-    "timestamp": "2025-01-18T10:00:00",
-    "duration": "120s",
-    "grapeql_version": "1.0"
-  },
-  "vulnerabilities": [
-    {
-      "type": "Authentication Bypass",
-      "severity": "High",
-      "description": "Unauthorized access to sensitive data",
-      "proof": "Query returned sensitive data without authentication"
-    }
-  ],
-  "recommendations": [
-    {
-      "title": "Implement Authentication",
-      "description": "Add proper authentication checks",
-      "priority": "High"
-    }
-  ]
-}
 ```
 
 ## Security Recommendations
 
 ### Implementation Guidelines
+
 1. Enable authentication for all sensitive queries
 2. Implement proper rate limiting
 3. Set query depth limits
@@ -201,32 +106,10 @@ query exposure {
 5. Implement proper error handling
 6. Enable logging and monitoring
 
-### Code Examples
-
-#### Query Depth Limiting (Node.js)
-```javascript
-import depthLimit from 'graphql-depth-limit';
-
-const server = new ApolloServer({
-  validationRules: [depthLimit(5)]
-});
-```
-
-#### Rate Limiting (Python)
-```python
-from graphql import GraphQLError
-from datetime import datetime, timedelta
-
-def rate_limit_directive(max_requests=100, window_seconds=60):
-    def rate_limit(resolver, *args, **kwargs):
-        # Rate limiting logic here
-        return resolver(*args, **kwargs)
-    return rate_limit
-```
-
 ## Best Practices
 
 ### Testing Methodology
+
 1. Start with non-intrusive tests
 2. Gradually increase test complexity
 3. Monitor system response
@@ -234,6 +117,7 @@ def rate_limit_directive(max_requests=100, window_seconds=60):
 5. Validate results manually
 
 ### Risk Mitigation
+
 1. Test in staging environments first
 2. Have rollback procedures ready
 3. Monitor system resources
@@ -241,7 +125,9 @@ def rate_limit_directive(max_requests=100, window_seconds=60):
 5. Have incident response plans
 
 ## Contributing
+
 We welcome contributions to GrapeQL! Please follow these steps:
+
 1. Fork the repository
 2. Create a feature branch
 3. Add tests for new features
@@ -249,12 +135,15 @@ We welcome contributions to GrapeQL! Please follow these steps:
 5. Follow our code of conduct
 
 ## License
+
 GrapeQL is licensed under the MIT License. See LICENSE file for details.
 
 ## A Note on Responsible Testing
+
 GrapeQL is a powerful testing tool. Always ensure you have explicit permission to test target systems and use the tool responsibly.
 
 ## Why GrapeQL?
+
 Like a bunch of grapes, GraphQL endpoints have many interconnected parts that need to be tested thoroughly. GrapeQL tests each "grape" (component) while understanding how they connect to form the whole cluster (API). Our tool is designed to be sweet and simple to use, while providing comprehensive coverage.
 ## Donation Link
 
