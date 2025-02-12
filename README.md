@@ -17,11 +17,9 @@ GrapeQL is a comprehensive GraphQL security assessment toolkit designed to help 
 ## Features
 
 ### 1. Endpoint Harvesting (The Vine)
+- Automated port scanning
 - Automated GraphQL endpoint discovery
 - Common endpoint path enumeration
-- Development/staging endpoint detection
-- WebSocket endpoint identification
-- Custom endpoint pattern matching
 
 ### 2. Schema Analysis (The Root)
 - Introspection query testing
