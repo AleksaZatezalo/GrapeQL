@@ -28,15 +28,6 @@ We aim to acknowledge receipt of your report within **48 hours** and will provid
 4. **Communication:** Affected parties are informed, and public advisories are issued if necessary.
 5. **Resolution:** Vulnerabilities are resolved in the next scheduled release or as a hotfix, depending on severity.
 
-## Supported Versions
-
-We actively maintain the following versions with security updates:
-
-- **Current Version (Latest):** Full support
-- **Previous Major Version:** Critical security updates only
-
-Older versions are not actively supported. We encourage users to update to the latest version to receive security patches.
-
 ## Contact
 
 For general security inquiries, contact us at [zabumaphu@gmail.com](mailto:zabumaphu@gmail.com).
