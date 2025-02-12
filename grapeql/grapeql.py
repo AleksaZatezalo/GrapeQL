@@ -262,11 +262,10 @@ async def main():
     """
     Main function to handle user input and perform both port scanning and endpoint scanning.
     """
+
     # Get IP and URL from the user
     ip = input("Enter the IP address to scan ports (e.g., 127.0.0.1): ").strip()
-
-    printMsg("Finding GraphQL Endpoints...")
-    
+    await scanIP(host=ip)
 
 # Example usage
 if __name__ == "__main__":
