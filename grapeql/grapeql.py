@@ -259,13 +259,7 @@ def parseUrl():
         print(f"Invalid input: {e}")
         return None
 
-async def main():
-    """
-    Main function to handle user input and perform both port scanning and endpoint scanning.
-    """
-
-    # Get IP and URL from the user
-    ip = input("Enter the IP address to scan ports (e.g., 127.0.0.1): ").strip()
+async def constructAddress(ip):
     print()
     printMsg("Beggining Portscan", status="success")
     ports = await scanIP(host=ip)
@@ -273,6 +267,16 @@ async def main():
     for port in ports:
         endpoint = "http://" + ip + ":" + str(port)
         valid_endpoits.append(endpoint)
+    return valid_endpoits
+
+async def main():
+    """
+    Main function to handle user input and perform both port scanning and endpoint scanning.
+    """
+
+    # Get IP and URL from the user
+    ip = input("Enter the IP address to scan ports (e.g., 127.0.0.1): ").strip()
+    valid_endpoits = await constructAddress(ip)
     
     print()
     printMsg("Beggining Directory Busting", status="success")
