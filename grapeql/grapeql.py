@@ -269,6 +269,18 @@ async def constructAddress(ip):
         valid_endpoits.append(endpoint)
     return valid_endpoits
 
+async def dirbList(valid_endpoints):
+    print()
+    printMsg("Beggining Directory Busting", status="success")
+    url_list = []
+    for endpoint in valid_endpoints:
+        list = await scanEndpoints(endpoint)
+        for item in list:
+            msg = "Found URL at " + item
+            printMsg(msg)
+            url_list.append(item)
+    return url_list
+
 async def main():
     """
     Main function to handle user input and perform both port scanning and endpoint scanning.
@@ -276,17 +288,8 @@ async def main():
 
     # Get IP and URL from the user
     ip = input("Enter the IP address to scan ports (e.g., 127.0.0.1): ").strip()
-    valid_endpoits = await constructAddress(ip)
-    
-    print()
-    printMsg("Beggining Directory Busting", status="success")
-    url_list = []
-    for endpoint in valid_endpoits:
-        list = await scanEndpoints(endpoint)
-        for item in list:
-            msg = "Found URL at " + item
-            printMsg(msg)
-            url_list.append(item)
+    valid_endpoints = await constructAddress(ip)
+    url_list = await dirbList(valid_endpoints)
 
 
 # Example usage
