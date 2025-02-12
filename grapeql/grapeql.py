@@ -55,7 +55,7 @@ def printWelcome():
     Prints a welcome message in purple color to standard output. 
     """
     
-    msg = "Welcome to GrapeQL, the GraphQL vuln scanner.For more infor type " + color.BOLD + "`help`.\n"
+    msg = "Welcome to GrapeQL, the GraphQL vuln scanner.\n"
     print(color.PURPLE +  msg + color.END)
 
 def printPrompt():
@@ -266,12 +266,24 @@ async def main():
 
     # Get IP and URL from the user
     ip = input("Enter the IP address to scan ports (e.g., 127.0.0.1): ").strip()
+    print()
+    printMsg("Beggining Portscan", status="success")
     ports = await scanIP(host=ip)
     valid_endpoits = [] # Constructs a list of ip:port constructions
     for port in ports:
-        endpoint = ip + ":" + str(port)
+        endpoint = "http://" + ip + ":" + str(port)
         valid_endpoits.append(endpoint)
     
+    print()
+    printMsg("Beggining Directory Busting", status="success")
+    url_list = []
+    for endpoint in valid_endpoits:
+        list = await scanEndpoints(endpoint)
+        for item in list:
+            msg = "Found URL at " + item
+            printMsg(msg)
+            url_list.append(item)
+
 
 # Example usage
 if __name__ == "__main__":
