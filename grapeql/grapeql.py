@@ -173,7 +173,7 @@ async def scanPorts(host, task_queue, open_ports):
             task_queue.task_done()
             break
         if await testPortNumber(host, port):
-            print(f'{host}:{port} [OPEN]')
+            printMsg(f'{host}:{port} [OPEN]')
             open_ports.append(port)
         task_queue.task_done()
 
@@ -210,6 +210,7 @@ async def dirb(session, base_url, path):
     Constructs a full URL and scans it for a valid response.
     Returns the path if the URL is accessible (status 200), otherwise None.
     """
+
     full_url = f"{base_url.rstrip('/')}/{path.lstrip('/')}"
     try:
         async with session.get(full_url) as response:
@@ -265,7 +266,12 @@ async def main():
 
     # Get IP and URL from the user
     ip = input("Enter the IP address to scan ports (e.g., 127.0.0.1): ").strip()
-    await scanIP(host=ip)
+    ports = await scanIP(host=ip)
+    valid_endpoits = [] # Constructs a list of ip:port constructions
+    for port in ports:
+        endpoint = ip + ":" + str(port)
+        valid_endpoits.append(endpoint)
+    
 
 # Example usage
 if __name__ == "__main__":
