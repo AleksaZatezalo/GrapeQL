@@ -3,8 +3,8 @@
 """
 Author: Aleksa Zatezalo
 Version: 1.0
-Date: October 2024
-Description: ASCII Art and 'graphics' for GrapeQL. 
+Date: February 2025
+Description: Main file for GrapeQL
 """
 
 import asyncio
