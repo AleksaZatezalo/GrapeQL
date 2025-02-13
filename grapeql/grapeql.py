@@ -9,7 +9,6 @@ Description: Main file for GrapeQL
 
 import asyncio
 import asyncio
-from grapePrint import grapePrint
 from vine import vine
 
 async def main():
