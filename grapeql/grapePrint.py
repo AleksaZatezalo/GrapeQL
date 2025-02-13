@@ -4,13 +4,25 @@ Version: 1.0
 Date: October 2024
 Description: ASCII Art and 'graphics' for GrapeQL. 
 """
-
 import time
 
 class grapePrint():
+    """
+    A class for handling colored console output formatting for the GrapeQL tool.
+    
+    This class provides methods for printing formatted messages, banners, and notifications
+    with various colors and styles using ANSI escape codes.
+    """
 
     def __init__(self):
-
+        """
+        Initialize the grapePrint class with ANSI color and style codes.
+        
+        Sets up color codes for:
+        - Standard colors (purple, cyan, blue, green, yellow, red)
+        - Text styles (bold, underline)
+        - Reset code (END)
+        """
         self.PURPLE = '\033[95m'
         self.CYAN = '\033[96m'
         self.DARKCYAN = '\033[36m'
@@ -24,10 +36,12 @@ class grapePrint():
 
     def printGrapes(self):
         """
-        Prints ASCII Grapes in purple color to standard output. 
-        """
+        Print the GrapeQL ASCII art logo in purple.
         
-        print(self.PURPLE + self.BOLD +  """
+        Displays a grape-themed ASCII art banner with purple coloring
+        and bold text styling.
+        """
+        print(self.PURPLE + self.BOLD + """
                 __
             __ {_/  
         \\_}\\ _
@@ -42,31 +56,44 @@ class grapePrint():
 
     def printTitle(self):
         """
-        Prints title sentance in purple color to standard output. 
-        """
+        Print the GrapeQL title and author information.
         
+        Displays the tool name and author in purple, bold text,
+        followed by line breaks.
+        """
         print(self.PURPLE + self.BOLD + "GrapeQL By Aleksa Zatezalo\n\n" + self.END)
 
     def printWelcome(self):
         """
-        Prints a welcome message in purple color to standard output. 
-        """
+        Print the welcome message for GrapeQL.
         
+        Displays a welcome message in purple text introducing
+        the tool's purpose.
+        """
         msg = "Welcome to GrapeQL, the GraphQL vuln scanner.\n"
-        print(self.PURPLE +  msg + self.END)
+        print(self.PURPLE + msg + self.END)
 
     def printPrompt(self):
         """
-        Prints a prompt in purple to standard output.
-        """
-
-        print(self.PURPLE +  "\n[GrapeQL] >" + self.END)
-
-    def printMsg(self, message, status="log"):
-        """
-        Prints various types of logs to standard output.
-        """
+        Print the GrapeQL command prompt.
         
+        Displays the tool's command prompt in purple text,
+        formatted as '[GrapeQL] >'.
+        """
+        print(self.PURPLE + "\n[GrapeQL] >" + self.END)
+
+    def printMsg(self, message: str, status: str = "log"):
+        """
+        Print a formatted message with appropriate status indicators and colors.
+        
+        Args:
+            message: The message text to display
+            status: The type of message to display. Valid options are:
+                   - "success" (green with [+])
+                   - "warning" (yellow with [!])
+                   - "failed" (red with [-])
+                   - "log" (cyan with [!], default)
+        """
         plus = "[+] "
         exclaim ="[!] "
         fail = "[-] "
@@ -83,9 +110,15 @@ class grapePrint():
 
     def printNotify(self):
         """
-        Prints messages about notifications and logs. 
+        Display example notifications for different message types.
+        
+        Shows examples of all available message formats with delays
+        between each example for better readability. Includes:
+        - Warning messages (yellow)
+        - Error messages (red)
+        - Success messages (green)
+        - Log messages (cyan)
         """
-
         time.sleep(0.25)
         print(self.BOLD + "EXAMPLE NOTIFICATIONS: " + self.END)
         time.sleep(0.5)
@@ -100,7 +133,13 @@ class grapePrint():
 
     def intro(self):
         """
-        Prints the introductory banner and prompt to standard output.
+        Display the complete GrapeQL introduction sequence.
+        
+        Shows the full introductory banner including:
+        - ASCII art logo
+        - Title and author information
+        - Welcome message
+        - Example notifications
         """
         self.printGrapes()
         self.printTitle()
