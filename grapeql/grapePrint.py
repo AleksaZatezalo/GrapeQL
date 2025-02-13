@@ -23,6 +23,7 @@ class grapePrint():
         - Text styles (bold, underline)
         - Reset code (END)
         """
+
         self.PURPLE = '\033[95m'
         self.CYAN = '\033[96m'
         self.DARKCYAN = '\033[36m'
@@ -41,6 +42,7 @@ class grapePrint():
         Displays a grape-themed ASCII art banner with purple coloring
         and bold text styling.
         """
+
         print(self.PURPLE + self.BOLD + """
                 __
             __ {_/  
@@ -61,26 +63,8 @@ class grapePrint():
         Displays the tool name and author in purple, bold text,
         followed by line breaks.
         """
+
         print(self.PURPLE + self.BOLD + "GrapeQL By Aleksa Zatezalo\n\n" + self.END)
-
-    def printWelcome(self):
-        """
-        Print the welcome message for GrapeQL.
-        
-        Displays a welcome message in purple text introducing
-        the tool's purpose.
-        """
-        msg = "Welcome to GrapeQL, the GraphQL vuln scanner.\n"
-        print(self.PURPLE + msg + self.END)
-
-    def printPrompt(self):
-        """
-        Print the GrapeQL command prompt.
-        
-        Displays the tool's command prompt in purple text,
-        formatted as '[GrapeQL] >'.
-        """
-        print(self.PURPLE + "\n[GrapeQL] >" + self.END)
 
     def printMsg(self, message: str, status: str = "log"):
         """
@@ -94,6 +78,7 @@ class grapePrint():
                    - "failed" (red with [-])
                    - "log" (cyan with [!], default)
         """
+        
         plus = "[+] "
         exclaim ="[!] "
         fail = "[-] "
@@ -119,6 +104,7 @@ class grapePrint():
         - Success messages (green)
         - Log messages (cyan)
         """
+        
         time.sleep(0.25)
         print(self.BOLD + "EXAMPLE NOTIFICATIONS: " + self.END)
         time.sleep(0.5)
@@ -141,6 +127,7 @@ class grapePrint():
         - Welcome message
         - Example notifications
         """
+
         self.printGrapes()
         self.printTitle()
         self.printWelcome()
