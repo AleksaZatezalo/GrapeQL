@@ -12,101 +12,105 @@ import asyncio
 import asyncio
 import aiohttp
 
-class color:
-   PURPLE = '\033[95m'
-   CYAN = '\033[96m'
-   DARKCYAN = '\033[36m'
-   BLUE = '\033[94m'
-   GREEN = '\033[92m'
-   YELLOW = '\033[93m'
-   RED = '\033[91m'
-   BOLD = '\033[1m'
-   UNDERLINE = '\033[4m'
-   END = '\033[0m'
+class grapePrint():
 
-def printGrapes():
-    """
-    Prints ASCII Grapes in purple color to standard output. 
-    """
-    
-    print(color.PURPLE + color.BOLD +  """
-              __
-        __ {_/  
-       \\_}\\ _
-          _\\(_)_  
-         (_)_)(_)_
-        (_)(_)_)(_)
-         (_)(_))_)
-          (_(_(_)
-           (_)_)
-            (_)
-    """)
+    def __init__(self):
 
-def printTitle():
-    """
-    Prints title sentance in purple color to standard output. 
-    """
-    
-    print(color.PURPLE + color.BOLD + "GrapeQL Version By Aleksa Zatezalo\n\n" + color.END)
+        self.PURPLE = '\033[95m'
+        self.CYAN = '\033[96m'
+        self.DARKCYAN = '\033[36m'
+        self.BLUE = '\033[94m'
+        self.GREEN = '\033[92m'
+        self.YELLOW = '\033[93m'
+        self.RED = '\033[91m'
+        self.BOLD = '\033[1m'
+        self.UNDERLINE = '\033[4m'
+        self.END = '\033[0m'
 
-def printWelcome():
-    """
-    Prints a welcome message in purple color to standard output. 
-    """
-    
-    msg = "Welcome to GrapeQL, the GraphQL vuln scanner.\n"
-    print(color.PURPLE +  msg + color.END)
+    def printGrapes(self):
+        """
+        Prints ASCII Grapes in purple color to standard output. 
+        """
+        
+        print(self.PURPLE + self.BOLD +  """
+                __
+            __ {_/  
+        \\_}\\ _
+            _\\(_)_  
+            (_)_)(_)_
+            (_)(_)_)(_)
+            (_)(_))_)
+            (_(_(_)
+            (_)_)
+                (_)
+        """)
 
-def printPrompt():
-    """
-    Prints a prompt in purple to standard output.
-    """
-    print(color.PURPLE +  "\n[GrapeQL] >" + color.END)
+    def printTitle(self):
+        """
+        Prints title sentance in purple color to standard output. 
+        """
+        
+        print(self.PURPLE + self.BOLD + "GrapeQL Version By Aleksa Zatezalo\n\n" + self.END)
 
-def printMsg(message, status="log"):
-    """
-    Prints various types of logs to standard output.
-    """
-    
-    plus = "[+] "
-    exclaim ="[!] "
-    fail = "[-] "
+    def printWelcome(self):
+        """
+        Prints a welcome message in purple color to standard output. 
+        """
+        
+        msg = "Welcome to GrapeQL, the GraphQL vuln scanner.\n"
+        print(self.PURPLE +  msg + self.END)
 
-    match status:
-        case "success":
-            print(color.GREEN + plus + message + color.END)
-        case "warning":
-            print(color.YELLOW + exclaim + message + color.END)
-        case "failed":
-            print(color.RED + fail + message + color.END)
-        case "log":
-            print(color.CYAN + exclaim + message + color.END)
+    def printPrompt(self):
+        """
+        Prints a prompt in purple to standard output.
+        """
 
-def printNotify():
-    """
-    Prints messages about notifications and logs. 
-    """
+        print(self.PURPLE +  "\n[GrapeQL] >" + self.END)
 
-    time.sleep(0.25)
-    print(color.BOLD + "EXAMPLE NOTIFICATIONS: " + color.END)
-    time.sleep(0.5)
-    printMsg("Warnings are printed like this.", status="warning")
-    time.sleep(0.5)
-    printMsg("Errors are printed like this.", status="failed")
-    time.sleep(0.5)
-    printMsg("Good news is printed like this.", status="success")
-    time.sleep(0.5)
-    printMsg("Logs are printed like this.\n", status="log")
-    time.sleep(0.5)
+    def printMsg(self, message, status="log"):
+        """
+        Prints various types of logs to standard output.
+        """
+        
+        plus = "[+] "
+        exclaim ="[!] "
+        fail = "[-] "
 
-def intro():
-    """
-    Prints the introductory banner and prompt to standard output.
-    """
-    printGrapes()
-    printTitle()
-    printWelcome()
-    printNotify()
+        match status:
+            case "success":
+                print(self.GREEN + plus + message + self.END)
+            case "warning":
+                print(self.YELLOW + exclaim + message + self.END)
+            case "failed":
+                print(self.RED + fail + message + self.END)
+            case "log":
+                print(self.CYAN + exclaim + message + self.END)
+
+    def printNotify(self):
+        """
+        Prints messages about notifications and logs. 
+        """
+
+        time.sleep(0.25)
+        print(self.BOLD + "EXAMPLE NOTIFICATIONS: " + self.END)
+        time.sleep(0.5)
+        self.printMsg("Warnings are printed like this.", status="warning")
+        time.sleep(0.5)
+        self.printMsg("Errors are printed like this.", status="failed")
+        time.sleep(0.5)
+        self.printMsg("Good news is printed like this.", status="success")
+        time.sleep(0.5)
+        self.printMsg("Logs are printed like this.\n", status="log")
+        time.sleep(0.5)
+
+    def intro(self):
+        """
+        Prints the introductory banner and prompt to standard output.
+        """
+        self.printGrapes()
+        self.printTitle()
+        self.printWelcome()
+        self.printNotify()
 
 #################
 #Global Variables#
@@ -131,6 +135,8 @@ async def testPortNumber(host, port, timeout=1):
     
 async def scanPorts(host, task_queue, open_ports):
 
+    message = grapePrint()
+
     # read tasks forever
     while True:
         # Get a port to scan from the queue
@@ -141,7 +147,7 @@ async def scanPorts(host, task_queue, open_ports):
             task_queue.task_done()
             break
         if await testPortNumber(host, port):
-            printMsg(f'{host}:{port} [OPEN]')
+            message.printMsg(f'{host}:{port} [OPEN]')
             open_ports.append(port)
         task_queue.task_done()
 
@@ -228,8 +234,10 @@ def parseUrl():
         return None
 
 async def constructAddress(ip):
+    message = grapePrint()
+
     print()
-    printMsg("Beggining Portscan", status="success")
+    message.printMsg("Beggining Portscan", status="success")
     ports = await scanIP(host=ip)
     valid_endpoits = [] # Constructs a list of ip:port constructions
     for port in ports:
@@ -238,14 +246,15 @@ async def constructAddress(ip):
     return valid_endpoits
 
 async def dirbList(valid_endpoints):
+    message = grapePrint()
     print()
-    printMsg("Beggining Directory Busting", status="success")
+    message.printMsg("Beggining Directory Busting", status="success")
     url_list = []
     for endpoint in valid_endpoints:
         list = await scanEndpoints(endpoint)
         for item in list:
             msg = "Found URL at " + item
-            printMsg(msg)
+            message.printMsg(msg)
             url_list.append(item)
     return url_list
 
@@ -270,6 +279,8 @@ async def check_endpoint(endpoint, session):
     }
     """
     
+    message = grapePrint()
+
     try:
         async with session.post(
             endpoint,
@@ -282,7 +293,7 @@ async def check_endpoint(endpoint, session):
                     result = await response.json()
                     if result and isinstance(result, dict):
                         if result.get('data', {}).get('__schema'):
-                            printMsg(f"Introspection enabled: {endpoint}")
+                            message.printMsg(f"Introspection enabled: {endpoint}")
                             return endpoint
                 except (aiohttp.ContentTypeError, ValueError) as e:
                     print(f"[-] JSON parsing error for {endpoint}: {str(e)}")
@@ -303,8 +314,9 @@ async def test_introspection(endpoints):
         List of endpoints where introspection is enabled
     """
 
+    message = grapePrint()
     print()
-    printMsg("Testing for introspection query", status="success")
+    message.printMsg("Testing for introspection query", status="success")
     async with aiohttp.ClientSession() as session:
         tasks = [check_endpoint(endpoint, session) for endpoint in endpoints]
         results = await asyncio.gather(*tasks)
@@ -324,5 +336,6 @@ async def main():
 
 # Example usage
 if __name__ == "__main__":
-    intro()
+    message = grapePrint()
+    message.intro()
     asyncio.run(main())
