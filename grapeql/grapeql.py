@@ -9,9 +9,7 @@ Description: ASCII Art and 'graphics' for GrapeQL.
 
 import time
 import asyncio
-import requests
 import asyncio
-from aiohttp import ClientSession
 import aiohttp
 
 class color:
@@ -195,7 +193,7 @@ async def scanEndpoints(base_url):
     Scans all endpoints in api_list asynchronously using dirb.
     Returns a list of valid paths.
     """
-    async with ClientSession() as session:
+    async with aiohttp.ClientSession() as session:
         tasks = [dirb(session, base_url, path) for path in apiList]
         results = await asyncio.gather(*tasks)
     return [result for result in results if result]
