@@ -110,37 +110,6 @@ def intro():
     printWelcome()
     printNotify()
 
-
-def parse_url():
-    """
-    Prompts the user to enter a URL in the form "http://IP:PORT".
-    Splits the URL into its components (protocol, IP, and port) and prints the IP and port.
-    
-    Returns:
-        tuple: A tuple containing the protocol (str), IP (str), and port (str).
-    """
-    url = input("Enter a URL in the format 'http://IP:PORT': ").strip()
-    try:
-        # Ensure the URL starts with "http://" or "https://"
-        if not url.startswith(("http://", "https://")):
-            raise ValueError("URL must start with 'http://' or 'https://'")
-
-        # Split the URL into protocol and the remaining part
-        protocol, rest = url.split("://")
-        
-        # Split the remaining part into IP and port
-        ip, port = rest.split(":")
-        
-        # Print the results
-        print(f"Protocol: {protocol}")
-        print(f"IP: {ip}")
-        print(f"Port: {port}")
-        
-        return protocol, ip, port
-    except ValueError as e:
-        print(f"Invalid input: {e}")
-        return None
-
 #################
 #Global Variables#
 #################
