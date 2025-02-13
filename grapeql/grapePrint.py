@@ -130,5 +130,4 @@ class grapePrint():
 
         self.printGrapes()
         self.printTitle()
-        self.printWelcome()
         self.printNotify()
