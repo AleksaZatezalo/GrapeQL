@@ -10,10 +10,8 @@ Tests for common GraphQL DoS vectors including:
 
 import asyncio
 import aiohttp
-import json
 import argparse
-from typing import Dict, List, Optional
-import sys
+from typing import Dict, Optional
 from datetime import datetime
 
 class GraphQLDoSChecker:
