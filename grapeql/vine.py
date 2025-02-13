@@ -9,7 +9,7 @@ import asyncio
 import aiohttp
 from typing import List
 from grapePrint import grapePrint
-
+import time
 class vine():
     """
     A class for scanning and identifying GraphQL endpoints with introspection enabled.
@@ -161,6 +161,7 @@ class vine():
 
         print()
         self.message.printMsg("Beginning Portscan", status="success")
+        time.sleep(3)
         ports = await self.scanIP(host=ip)
         return [f"http://{ip}:{port}" for port in ports]
 
@@ -177,6 +178,7 @@ class vine():
         
         print()
         self.message.printMsg("Beginning Directory Busting", status="success")
+        time.sleep(3)
         url_list = []
         for endpoint in valid_endpoints:
             found_urls = await self.scanEndpoints(endpoint)
@@ -240,6 +242,7 @@ class vine():
 
         print()
         self.message.printMsg("Testing for introspection query", status="success")
+        time.sleep(3)
         async with aiohttp.ClientSession() as session:
             tasks = [self.checkEndpoint(endpoint, session) for endpoint in endpoints]
             results = await asyncio.gather(*tasks)
