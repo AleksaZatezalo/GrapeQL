@@ -12,6 +12,7 @@ import asyncio
 import requests
 import asyncio
 from aiohttp import ClientSession
+import aiohttp
 
 class color:
    PURPLE = '\033[95m'
@@ -281,6 +282,68 @@ async def dirbList(valid_endpoints):
             url_list.append(item)
     return url_list
 
+async def check_endpoint(endpoint, session):
+    """
+    Check a single GraphQL endpoint for enabled introspection.
+    
+    Args:
+        endpoint: GraphQL endpoint URL to test
+        session: Shared aiohttp client session
+        
+    Returns:
+        endpoint URL if introspection is enabled, None otherwise
+    """
+    query = """
+    query {
+        __schema {
+            types {
+                name
+            }
+        }
+    }
+    """
+    
+    try:
+        async with session.post(
+            endpoint,
+            json={'query': query},
+            headers={'Content-Type': 'application/json'},
+            timeout=aiohttp.ClientTimeout(total=10)
+        ) as response:
+            if response.status == 200:
+                try:
+                    result = await response.json()
+                    if result and isinstance(result, dict):
+                        if result.get('data', {}).get('__schema'):
+                            printMsg(f"Introspection enabled: {endpoint}")
+                            return endpoint
+                except (aiohttp.ContentTypeError, ValueError) as e:
+                    print(f"[-] JSON parsing error for {endpoint}: {str(e)}")
+                    
+    except Exception as e:
+        pass
+    
+    return None
+
+async def test_introspection(endpoints):
+    """
+    Test multiple GraphQL endpoints for enabled introspection and return vulnerable ones.
+    
+    Args:
+        endpoints: List of GraphQL endpoint URLs to test
+        
+    Returns:
+        List of endpoints where introspection is enabled
+    """
+
+    print()
+    printMsg("Testing for introspection query", status="success")
+    async with aiohttp.ClientSession() as session:
+        tasks = [check_endpoint(endpoint, session) for endpoint in endpoints]
+        results = await asyncio.gather(*tasks)
+        
+        return [endpoint for endpoint in results if endpoint]
+    
 async def main():
     """
     Main function to handle user input and perform both port scanning and endpoint scanning.
@@ -290,7 +353,7 @@ async def main():
     ip = input("Enter the IP address to scan ports (e.g., 127.0.0.1): ").strip()
     valid_endpoints = await constructAddress(ip)
     url_list = await dirbList(valid_endpoints)
-
+    introspection = await test_introspection(url_list)
 
 # Example usage
 if __name__ == "__main__":
