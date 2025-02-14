@@ -273,28 +273,36 @@ class vine():
             self.message.printMsg(f"Burp proxy validation failed: {str(e)}", status="error")
             return False
         
-    async def test(self):
-        """
-        Main execution function that coordinates the scanning process.
+    async def test(self, proxy_string: str, target_ip: str):
+            """
+            Main execution function that coordinates the scanning process.
 
-        Returns:
-            List[str]: List of vulnerable GraphQL endpoints found
-        """
-        self.message.intro()
-        
-        # Get Burp proxy details
-        proxy_host = input("Enter Burp proxy host (default: 127.0.0.1): ").strip() or "127.0.0.1"
-        proxy_port = int(input("Enter Burp proxy port (default: 8080): ").strip() or "8080")
-        
-        # Validate and configure proxy
-        if not self.validate_proxy(proxy_host, proxy_port):
-            self.message.printMsg("Cannot connect to Burp proxy. Please ensure Burp is running and proxy settings are correct.", status="error")
-            return []
+            Args:
+                proxy_string: String containing proxy host and port in format "host:port"
+                target_ip: Target IP address to scan
+
+            Returns:
+                List[str]: List of vulnerable GraphQL endpoints found
+            """
+            self.message.intro()
             
-        self.configure_proxy(proxy_host, proxy_port)
-        
-        # Get target IP and perform direct port scan
-        ip = input("Enter the IP address to scan ports (e.g., 127.0.0.1): ").strip()
-        valid_endpoints = await self.constructAddress(ip)
-        url_list = await self.dirbList(valid_endpoints)
-        return await self.introspection(url_list)
+            try:
+                # Parse proxy string
+                proxy_host, proxy_port_str = proxy_string.split(':')
+                proxy_port = int(proxy_port_str)
+                
+                # Validate and configure proxy
+                if not self.validate_proxy(proxy_host, proxy_port):
+                    self.message.printMsg("Cannot connect to Burp proxy. Please ensure Burp is running and proxy settings are correct.", status="error")
+                    return []
+                    
+                self.configure_proxy(proxy_host, proxy_port)
+                
+                # Perform scan using provided target IP
+                valid_endpoints = await self.constructAddress(target_ip)
+                url_list = await self.dirbList(valid_endpoints)
+                return await self.introspection(url_list)
+                
+            except ValueError:
+                self.message.printMsg("Invalid proxy string format. Expected format: host:port", status="error")
+                return []
