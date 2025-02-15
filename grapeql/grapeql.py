@@ -4,7 +4,6 @@ Version: 1.3
 Date: February 2025
 Description: Main file for GrapeQL with command-line argument support and direct API testing
 """
-
 import asyncio
 import argparse
 from vine import vine
@@ -26,22 +25,23 @@ def load_wordlist(wordlist_path):
         print(f"Error loading wordlist: {str(e)}")
         return None
 
-async def test_single_endpoint(scanner: vine, api_url: str, proxy: str) -> int:
+async def test_single_endpoint(scanner: vine, api_url: str, proxy: str = None) -> int:
     """
     Test a single API endpoint for GraphQL introspection.
     
     Args:
         scanner: Initialized vine scanner
         api_url: Full URL of the API endpoint to test
-        proxy: Proxy address in host:port format
+        proxy: Optional proxy address in host:port format
         
     Returns:
         int: Exit code (0 for success, 1 for failure)
     """
     try:
-        # Configure proxy
-        proxy_host, proxy_port = proxy.split(':')
-        scanner.configure_proxy(proxy_host, int(proxy_port))
+        # Configure proxy if provided
+        if proxy:
+            proxy_host, proxy_port = proxy.split(':')
+            scanner.configure_proxy(proxy_host, int(proxy_port))
         
         # Test single endpoint
         vulnerable = await scanner.introspection([api_url])
@@ -63,7 +63,7 @@ async def main():
     Main function to handle command-line arguments and perform graphql scanning.
     """
     parser = argparse.ArgumentParser(
-        description='GraphQL Endpoint Scanner with Proxy Support',
+        description='GraphQL Endpoint Scanner with Optional Proxy Support',
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     
@@ -80,8 +80,7 @@ async def main():
     
     parser.add_argument(
         '-p', '--proxy',
-        required=True,
-        help='Proxy address in format host:port (e.g., 127.0.0.1:8080)'
+        help='Optional proxy address in format host:port (e.g., 127.0.0.1:8080)'
     )
     
     parser.add_argument(
@@ -107,7 +106,8 @@ async def main():
                     return 1
                 scanner.setApiList(wordlist)
                 
-            introspection = await scanner.test(args.proxy, args.target)
+            # Call test with None for proxy if not provided
+            introspection = await scanner.test(args.proxy if args.proxy else None, args.target)
             
             if introspection:
                 print("\nVulnerable endpoints found:")
@@ -125,3 +125,4 @@ async def main():
 if __name__ == "__main__":
     exit_code = asyncio.run(main())
     exit(exit_code)
+
