@@ -45,6 +45,60 @@ class vine():
             proxy_port: The proxy server port
         """
         self.proxy_url = f"http://{proxy_host}:{proxy_port}"
+    
+    def setApiList(self, endpoints: List[str]) -> bool:
+        """
+        Set a custom list of API endpoints to scan.
+
+        Args:
+            endpoints: List of endpoint paths to scan (e.g., ['/graphql', '/api/graphql'])
+
+        Returns:
+            bool: True if endpoints were set successfully, False otherwise
+
+        Example:
+            scanner = vine()
+            scanner.setApiList(['/graphql', '/api/graphql', '/v1/graphql'])
+        """
+        try:
+            # Validate input is a list
+            if not isinstance(endpoints, list):
+                self.message.printMsg("Error: Endpoints must be provided as a list", status="error")
+                return False
+
+            # Validate each endpoint
+            cleaned_endpoints = []
+            for endpoint in endpoints:
+                # Check if endpoint is a string
+                if not isinstance(endpoint, str):
+                    self.message.printMsg(f"Warning: Skipping invalid endpoint: {endpoint}", status="warning")
+                    continue
+
+                # Clean the endpoint
+                cleaned = endpoint.strip()
+                
+                # Ensure endpoint starts with /
+                if not cleaned.startswith('/'):
+                    cleaned = '/' + cleaned
+
+                # Remove any trailing slashes
+                cleaned = cleaned.rstrip('/')
+
+                cleaned_endpoints.append(cleaned)
+
+            # Check if we have any valid endpoints
+            if not cleaned_endpoints:
+                self.message.printMsg("Error: No valid endpoints provided", status="error")
+                return False
+
+            # Set the new API list
+            self.apiList = cleaned_endpoints
+            self.message.printMsg(f"Successfully set {len(cleaned_endpoints)} endpoints", status="success")
+            return True
+
+        except Exception as e:
+            self.message.printMsg(f"Error setting API list: {str(e)}", status="error")
+            return False
 
     async def testPortNumber(self, host: str, port: int) -> bool:
         """
