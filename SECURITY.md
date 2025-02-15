@@ -33,4 +33,3 @@ We aim to acknowledge receipt of your report within **48 hours** and will provid
 For general security inquiries, contact us at [zabumaphu@gmail.com](mailto:zabumaphu@gmail.com).
 
 Thank you for helping us keep this project secure!
-

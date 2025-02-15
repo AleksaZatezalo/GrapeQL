@@ -6,14 +6,6 @@ Description: Enumeration script for GraphQL endpoints with proxy support for HTT
 Port scanning is performed directly while directory busting and introspection are proxied.
 """
 
-"""
-Author: Original by Aleksa Zatezalo, Modified Version
-Version: 1.2
-Date: February 2025
-Description: Enumeration script for GraphQL endpoints with Burpsuite proxy support.
-Port scanning is performed directly while directory busting and introspection are proxied through Burp.
-"""
-
 import asyncio
 import aiohttp
 from typing import List, Tuple, Optional

@@ -7,6 +7,8 @@ Description: Main file for GrapeQL with command-line argument support and direct
 import asyncio
 import argparse
 from vine import vine
+from root import root
+from grapePrint import grapePrint
 
 def load_wordlist(wordlist_path):
     """
@@ -91,6 +93,8 @@ async def main():
         
         # Direct API endpoint testing
         if args.api:
+            message = grapePrint()
+            message.intro
             introspection = await test_single_endpoint(scanner, args.api, args.proxy)
             
         # Full scan mode
@@ -104,13 +108,14 @@ async def main():
                 
             # Call test with None for proxy if not provided
             introspection = await scanner.test(args.proxy if args.proxy else None, args.target)
-            
-            if introspection:
-                print("\nVulnerable endpoints found:")
-                for endpoint in introspection:
-                    print(f"- {endpoint}")
+        
+        if introspection:            
+            dos_tester = root()
+            # First set the endpoint and get schema
+            if await dos_tester.setEndpoint(introspection[0], args.proxy if args.proxy else None):
+                await dos_tester.test_endpoint_dos()
             else:
-                print("\nNo vulnerable endpoints found.")
+                print("Failed to set endpoint or retrieve schema")
             
     except Exception as e:
         print(f"Error during scan: {str(e)}")

