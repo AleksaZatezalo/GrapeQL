@@ -1,6 +1,6 @@
 """
-Author: Extension of Aleksa Zatezalo's GrapeQL
-Version: 1.1
+Version: 1.0
+Author:Aleksa Zatezalo
 Date: February 2025
 Description: GraphQL DoS testing module with schema-aware query generation
 """
