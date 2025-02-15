@@ -94,7 +94,7 @@ async def main():
         # Direct API endpoint testing
         if args.api:
             message = grapePrint()
-            message.intro
+            message.intro()
             introspection = await test_single_endpoint(scanner, args.api, args.proxy)
             
         # Full scan mode
