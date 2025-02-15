@@ -47,11 +47,7 @@ async def test_single_endpoint(scanner: vine, api_url: str, proxy: str = None) -
         vulnerable = await scanner.introspection([api_url])
         
         if vulnerable:
-            print("\nVulnerable endpoint found:")
-            print(f"- {vulnerable[0]}")
-        else:
-            print("\nEndpoint is not vulnerable to introspection.")
-            
+            return vulnerable
         return 0
         
     except Exception as e:
@@ -95,7 +91,7 @@ async def main():
         
         # Direct API endpoint testing
         if args.api:
-            return await test_single_endpoint(scanner, args.api, args.proxy)
+            introspection = await test_single_endpoint(scanner, args.api, args.proxy)
             
         # Full scan mode
         else:
