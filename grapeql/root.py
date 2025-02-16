@@ -27,7 +27,7 @@ class root():
         self.types: Dict[str, Dict] = {}
     
 
-    def print_vulnerability_details(self, vuln_type: str, is_vulnerable: bool, duration: float):
+    def printVulnerabilityDetails(self, vuln_type: str, is_vulnerable: bool, duration: float):
         """Print detailed information about the vulnerability test results."""
         if is_vulnerable:
             self.message.printMsg(f"Endpoint is VULNERABLE to {vuln_type}!", status="warning")
@@ -149,11 +149,11 @@ class root():
             self.message.printMsg(f"Endpoint is NOT vulnerable to {vuln_type}", status="success")
             self.message.printMsg(f"Response time: {duration:.2f} seconds", status="success")
 
-    def configure_proxy(self, proxy_host: str, proxy_port: int):
+    def configureProxy(self, proxy_host: str, proxy_port: int):
         """Configure HTTP proxy settings."""
         self.proxy_url = f"http://{proxy_host}:{proxy_port}"
 
-    async def run_introspection(self, session: aiohttp.ClientSession) -> bool:
+    async def runIntrospection(self, session: aiohttp.ClientSession) -> bool:
         """
         Run introspection query to get schema information.
         """
@@ -213,7 +213,7 @@ class root():
             self.message.printMsg(f"Introspection query failed: {str(e)}", status="failed")
             return False
 
-    def generate_circular_query(self) -> str:
+    def generateCircularQuery(self) -> str:
         """
         Generate a circular query based on schema types that reference each other.
         """
@@ -250,7 +250,7 @@ class root():
 
         return f"query {{ {nested_query} }}"
 
-    def generate_field_duplication(self) -> str:
+    def generateFieldDuplication(self) -> str:
         """
         Generate a query with duplicated fields based on schema.
         """
@@ -271,7 +271,7 @@ class root():
         duplicated_field = f"{scalar_fields[0]}\n" * 10000
         return f"query {{ {duplicated_field} }}"
 
-    def generate_directive_overload(self) -> str:
+    def generateDirectiveOverload(self) -> str:
         """
         Generate a query with excessive directives based on schema.
         """
@@ -293,7 +293,7 @@ class root():
         }}
         """
 
-    def generate_object_override(self) -> str:
+    def generateObjectOverride(self) -> str:
         """
         Generate a deeply nested query based on schema types.
         """
@@ -322,7 +322,7 @@ class root():
 
         return f"query {{ {current_query} }}"
 
-    def generate_array_batching(self) -> List[Dict[str, str]]:
+    def generateArrayBatching(self) -> List[Dict[str, str]]:
         """
         Generate a batch of queries based on schema.
         """
@@ -362,18 +362,18 @@ class root():
         if proxy_string:
             try:
                 proxy_host, proxy_port = proxy_string.split(':')
-                self.configure_proxy(proxy_host, int(proxy_port))
+                self.configureProxy(proxy_host, int(proxy_port))
             except ValueError:
                 self.message.printMsg("Invalid proxy format. Expected host:port", status="failed")
                 return False
 
         # Run introspection
         async with aiohttp.ClientSession() as session:
-            return await self.run_introspection(session)
+            return await self.runIntrospection(session)
 
-    async def test_circular_query(self, session: aiohttp.ClientSession) -> Tuple[bool, float]:
+    async def testCircularQuery(self, session: aiohttp.ClientSession) -> Tuple[bool, float]:
         """Test for circular query vulnerability using schema-based query."""
-        query = self.generate_circular_query()
+        query = self.generateCircularQuery()
         if not query:
             return False, 0.0
 
@@ -395,9 +395,9 @@ class root():
         except Exception:
             return False, 0.0
 
-    async def test_field_duplication(self, session: aiohttp.ClientSession) -> Tuple[bool, float]:
+    async def testFieldDuplication(self, session: aiohttp.ClientSession) -> Tuple[bool, float]:
         """Test for field duplication vulnerability using schema-based query."""
-        query = self.generate_field_duplication()
+        query = self.generateFieldDuplication()
         if not query:
             return False, 0.0
 
@@ -419,9 +419,9 @@ class root():
         except Exception:
             return False, 0.0
 
-    async def test_directive_overload(self, session: aiohttp.ClientSession) -> Tuple[bool, float]:
+    async def testDirectiveOverload(self, session: aiohttp.ClientSession) -> Tuple[bool, float]:
         """Test for directive overloading vulnerability using schema-based query."""
-        query = self.generate_directive_overload()
+        query = self.generateDirectiveOverload()
         if not query:
             return False, 0.0
 
@@ -443,9 +443,9 @@ class root():
         except Exception:
             return False, 0.0
 
-    async def test_object_override(self, session: aiohttp.ClientSession) -> Tuple[bool, float]:
+    async def testObjectOverride(self, session: aiohttp.ClientSession) -> Tuple[bool, float]:
         """Test for object override vulnerability using schema-based query."""
-        query = self.generate_object_override()
+        query = self.generateObjectOverride()
         if not query:
             return False, 0.0
 
@@ -467,9 +467,9 @@ class root():
         except Exception:
             return False, 0.0
 
-    async def test_array_batching(self, session: aiohttp.ClientSession) -> Tuple[bool, float]:
+    async def testArrayBatching(self, session: aiohttp.ClientSession) -> Tuple[bool, float]:
         """Test for array batching vulnerability using schema-based query."""
-        queries = self.generate_array_batching()
+        queries = self.generateArrayBatching()
         if not queries:
             return False, 0.0
 
@@ -491,7 +491,7 @@ class root():
         except Exception:
             return False, 0.0
 
-    async def test_endpoint_dos(self):
+    async def testEndpointDos(self):
         """
         Test the endpoint for all DoS vulnerabilities using schema-based queries.
         """
@@ -503,17 +503,17 @@ class root():
         
         async with aiohttp.ClientSession() as session:
             tests = [
-                ("Circular Query DoS", self.test_circular_query),
-                ("Field Duplication DoS", self.test_field_duplication),
-                ("Directive Overload DoS", self.test_directive_overload),
-                ("Object Override DoS", self.test_object_override),
-                ("Array Batching DoS", self.test_array_batching)
+                ("Circular Query DoS", self.testCircularQuery),
+                ("Field Duplication DoS", self.testFieldDuplication),
+                ("Directive Overload DoS", self.testDirectiveOverload),
+                ("Object Override DoS", self.testObjectOverride),
+                ("Array Batching DoS", self.testArrayBatching)
             ]
             
             for vuln_type, test_func in tests:
                 self.message.printMsg(f"Testing for {vuln_type}...", status="log")
                 is_vulnerable, duration = await test_func(session)
-                self.print_vulnerability_details(vuln_type, is_vulnerable, duration)
+                self.printVulnerabilityDetails(vuln_type, is_vulnerable, duration)
                 await asyncio.sleep(1)  # Pause between tests
 
 # async def main():
@@ -522,7 +522,7 @@ class root():
 #     # First set the endpoint and get schema
 #     if await dos_tester.setEndpoint("http://127.0.0.1:5013/graphql", "127.0.0.1:8080"):
 #         # Then run the DOS tests
-#         await dos_tester.test_endpoint_dos()
+#         await dos_tester.testEndpointDos()
 #     else:
 #         print("Failed to set endpoint or retrieve schema")
 

@@ -10,7 +10,7 @@ from vine import vine
 from root import root
 from grapePrint import grapePrint
 
-def load_wordlist(wordlist_path):
+def loadWordlist(wordlist_path):
     """
     Load endpoints from a wordlist file.
     
@@ -27,7 +27,7 @@ def load_wordlist(wordlist_path):
         print(f"Error loading wordlist: {str(e)}")
         return None
 
-async def test_single_endpoint(scanner: vine, api_url: str, proxy: str = None) -> int:
+async def testSingleEndpoint(scanner: vine, api_url: str, proxy: str = None) -> int:
     """
     Test a single API endpoint for GraphQL introspection.
     
@@ -95,13 +95,13 @@ async def main():
         if args.api:
             message = grapePrint()
             message.intro()
-            introspection = await test_single_endpoint(scanner, args.api, args.proxy)
+            introspection = await testSingleEndpoint(scanner, args.api, args.proxy)
             
         # Full scan mode
         else:
             # Load custom wordlist if specified
             if args.wordlist:
-                wordlist = load_wordlist(args.wordlist)
+                wordlist = loadWordlist(args.wordlist)
                 if wordlist is None:
                     return 1
                 scanner.setApiList(wordlist)

@@ -28,7 +28,7 @@ class vine():
            "/api/graphql/v1", "/api/graphql/v2", "/api/public/graphql", "/api/private/graphql", "/admin/graphql", "/user/graphql"]
         self.proxy_url: Optional[str] = None
         
-    def configure_proxy(self, proxy_host: str, proxy_port: int):
+    def configureProxy(self, proxy_host: str, proxy_port: int):
         """
         Configure the HTTP proxy settings for Burpsuite.
 
@@ -344,7 +344,7 @@ class vine():
                         self.message.printMsg("Cannot connect to proxy. Please ensure proxy is running and settings are correct.", status="error")
                         return []
                         
-                    self.configure_proxy(proxy_host, proxy_port)
+                    self.configureProxy(proxy_host, proxy_port)
                 except ValueError:
                     self.message.printMsg("Invalid proxy string format. Expected format: host:port", status="error")
                     return []
