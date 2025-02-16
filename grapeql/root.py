@@ -491,7 +491,7 @@ class root():
         except Exception:
             return False, 0.0
 
-    async def testEndpointDos(self):
+    async def test_endpoint_dos(self):
         """
         Test the endpoint for all DoS vulnerabilities using schema-based queries.
         """
@@ -522,7 +522,7 @@ class root():
 #     # First set the endpoint and get schema
 #     if await dos_tester.setEndpoint("http://127.0.0.1:5013/graphql", "127.0.0.1:8080"):
 #         # Then run the DOS tests
-#         await dos_tester.testEndpointDos()
+#         await dos_tester.test_endpoint_dos()
 #     else:
 #         print("Failed to set endpoint or retrieve schema")
 

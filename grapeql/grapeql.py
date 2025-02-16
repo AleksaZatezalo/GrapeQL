@@ -113,7 +113,7 @@ async def main():
             dos_tester = root()
             # First set the endpoint and get schema
             if await dos_tester.setEndpoint(introspection[0], args.proxy if args.proxy else None):
-                await dos_tester.test_endpoint_dos()
+                await dos_tester.testEndpointDos()
             else:
                 print("Failed to set endpoint or retrieve schema")
             
