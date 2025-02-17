@@ -32,9 +32,6 @@ class root():
         if is_vulnerable:
             self.message.printMsg(f"Endpoint is VULNERABLE to {vuln_type}!", status="failed")
             self.message.printMsg(f"Response time: {duration:.2f} seconds", status="failed")
-            
-            # Print specific remediation advice based on vulnerability type
-            print("\nRemediation Advice:")
         else:
             self.message.printMsg(f"Endpoint is NOT vulnerable to {vuln_type}", status="success")
             self.message.printMsg(f"Response time: {duration:.2f} seconds", status="success")
@@ -93,7 +90,7 @@ class root():
                                     'fields': type_info['fields']
                                 }
                         
-                        self.message.printMsg("Successfully retrieved schema", status="success")
+                        self.message.printMsg("Successfully retrieved schema", status="log")
                         return True
                     
             self.message.printMsg("Failed to parse introspection result", status="failed")
@@ -414,8 +411,9 @@ class root():
         if not self.endpoint or not self.schema:
             self.message.printMsg("No endpoint set or schema not retrieved. Run setEndpoint first.", status="failed")
             return
-
-        self.message.printMsg(f"Testing endpoint: {self.endpoint}", status="log")
+        
+        print()
+        self.message.printMsg(f"Testing endpoint: {self.endpoint} for DOS attacks", status="success")
         
         async with aiohttp.ClientSession() as session:
             tests = [
