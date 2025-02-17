@@ -16,6 +16,7 @@ import time
 # 2. Remove Websocket Findings
 # 3. Limit Links
 # 4. Set Introspection DICT
+# 5. Port DDOS Tests To the CRUSH
 
 class root():
     """
