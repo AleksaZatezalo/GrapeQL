@@ -30,121 +30,11 @@ class root():
     def printVulnerabilityDetails(self, vuln_type: str, is_vulnerable: bool, duration: float):
         """Print detailed information about the vulnerability test results."""
         if is_vulnerable:
-            self.message.printMsg(f"Endpoint is VULNERABLE to {vuln_type}!", status="warning")
-            self.message.printMsg(f"Response time: {duration:.2f} seconds", status="warning")
+            self.message.printMsg(f"Endpoint is VULNERABLE to {vuln_type}!", status="failed")
+            self.message.printMsg(f"Response time: {duration:.2f} seconds", status="failed")
             
             # Print specific remediation advice based on vulnerability type
             print("\nRemediation Advice:")
-            match vuln_type:
-                case "Circular Query DoS":
-                    print("""
-    1. Implement query depth limiting
-    2. Set maximum recursion depth
-    3. Use query cost analysis
-    4. Consider implementing persisted queries
-    5. Monitor and rate limit by client IP
-    
-    Example configuration (for Apollo Server):
-    ```
-    const server = new ApolloServer({
-      schema,
-      validationRules: [
-        depthLimit(5),
-        costAnalysis({
-          maximumCost: 1000,
-        }),
-      ],
-    });
-    ```
-                    """)
-                    
-                case "Field Duplication DoS":
-                    print("""
-    1. Implement field count limiting
-    2. Use query cost analysis
-    3. Cache frequently requested fields
-    4. Set maximum query complexity
-    5. Consider implementing automatic field merging
-    
-    Example configuration:
-    ```
-    const server = new ApolloServer({
-      schema,
-      validationRules: [
-        QueryComplexity({
-          maximumComplexity: 1000,
-          variables: {},
-          onComplete: (complexity) => {
-            console.log('Query Complexity:', complexity);
-          },
-        }),
-      ],
-    });
-    ```
-                    """)
-                    
-                case "Directive Overload DoS":
-                    print("""
-    1. Limit number of directives per query
-    2. Implement directive-specific rate limiting
-    3. Cache directive resolution results
-    4. Set maximum directive depth
-    5. Monitor directive usage patterns
-    
-    Example implementation:
-    ```
-    const directiveLimit = (maxDirectives) => ({
-      Field: (node) => {
-        const directiveCount = node.directives.length;
-        if (directiveCount > maxDirectives) {
-          throw new Error(`Query has too many directives: ${directiveCount}`);
-        }
-        return node;
-      },
-    });
-    ```
-                    """)
-                    
-                case "Object Override DoS":
-                    print("""
-    1. Implement object nesting limits
-    2. Set maximum response size
-    3. Use pagination for large objects
-    4. Monitor memory usage
-    5. Implement response caching
-    
-    Example configuration:
-    ```
-    const schema = makeExecutableSchema({
-      typeDefs,
-      resolvers,
-      validationRules: [
-        MaxObjectNestingRule(5),
-        MaxResponseSizeRule(1000000),
-      ],
-    });
-    ```
-                    """)
-                    
-                case "Array Batching DoS":
-                    print("""
-    1. Implement batch size limits
-    2. Set maximum concurrent queries
-    3. Use query cost analysis for batches
-    4. Implement request queuing
-    5. Monitor batch processing times
-    
-    Example configuration:
-    ```
-    const server = new ApolloServer({
-      schema,
-      validationRules: [
-        BatchLimitRule(100),
-        ConcurrentQueryLimit(10),
-      ],
-    });
-    ```
-                    """)
         else:
             self.message.printMsg(f"Endpoint is NOT vulnerable to {vuln_type}", status="success")
             self.message.printMsg(f"Response time: {duration:.2f} seconds", status="success")
@@ -215,40 +105,66 @@ class root():
 
     def generateCircularQuery(self) -> str:
         """
-        Generate a circular query based on schema types that reference each other.
+        Generate a deeply nested circular query based on schema types that reference each other.
+        Creates a complex recursive query pattern to test for DoS vulnerabilities.
         """
         if not self.schema:
             return ""
 
-        # Find a type that has a field referencing another type
-        circular_fields = []
+        # Get all fields that reference other types
+        circular_refs = []
         for type_name, type_info in self.types.items():
             for field in type_info.get('fields', []):
                 field_type = field['type'].get('name') or field['type'].get('ofType', {}).get('name')
                 if field_type in self.types:
-                    circular_fields.append((type_name, field['name'], field_type))
+                    circular_refs.append({
+                        'type': type_name,
+                        'field': field['name'], 
+                        'target': field_type
+                    })
 
-        if not circular_fields:
+        if not circular_refs:
             return ""
 
-        # Generate nested query using the first circular reference found
-        type_name, field_name, field_type = circular_fields[0]
-        nested_query = f"""
-            {field_name} {{
-                id
-                {field_name} {{
-                    id
-                    {field_name} {{
-                        id
-                        {field_name} {{
-                            id
-                        }}
-                    }}
-                }}
-            }}
+        # Pick first circular reference to start with
+        base_ref = circular_refs[0]
+        
+        # Create deeply nested query
+        nested_query = """
+            id
+            name 
+            description
+            createdAt
         """
 
-        return f"query {{ {nested_query} }}"
+        # Build up nested levels
+        for _ in range(10):
+            nested_query = f"""
+            {base_ref['field']} {{
+                id
+                name
+                description
+                createdAt
+                {nested_query}
+                {base_ref['field']} {{
+                    id
+                    name
+                    description 
+                    {nested_query}
+                }}
+            }}
+            """
+
+        # Duplicate the entire query structure multiple times
+        full_query = f"""
+        query CircularQuery {{
+            {nested_query}
+            {nested_query}
+            {nested_query}
+        }}
+        """
+
+        return full_query
 
     def generateFieldDuplication(self) -> str:
         """
@@ -491,7 +407,7 @@ class root():
         except Exception:
             return False, 0.0
 
-    async def test_endpoint_dos(self):
+    async def testEndpointDos(self):
         """
         Test the endpoint for all DoS vulnerabilities using schema-based queries.
         """
@@ -514,7 +430,7 @@ class root():
                 self.message.printMsg(f"Testing for {vuln_type}...", status="log")
                 is_vulnerable, duration = await test_func(session)
                 self.printVulnerabilityDetails(vuln_type, is_vulnerable, duration)
-                await asyncio.sleep(1)  # Pause between tests
+                await asyncio.sleep(1)
 
 # async def main():
 #     dos_tester = grapeDos()
