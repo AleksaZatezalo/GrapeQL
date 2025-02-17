@@ -13,6 +13,12 @@ from grapePrint import grapePrint
 import time
 import socket
 
+### TO DO
+# 1. Fingerprint Like GraphW00F
+# 2. Remove Websocket Findings
+# 3. Limit Links
+# 4. Return Introspection Results In Dict
+
 class vine():
     """
     A class for scanning and identifying GraphQL endpoints with introspection enabled.

@@ -11,6 +11,12 @@ from typing import Dict, List, Optional, Tuple, Any
 from grapePrint import grapePrint
 import time
 
+### TO DO
+# 1. Fingerprint Like GraphW00F
+# 2. Remove Websocket Findings
+# 3. Limit Links
+# 4. Set Introspection DICT
+
 class root():
     """
     A class for testing GraphQL endpoints for various Denial of Service vulnerabilities.
