@@ -278,8 +278,6 @@ class vine():
         except Exception as e:
             self.message.printMsg(f"Error testing {endpoint}: {str(e)}", status="error")
         return None
-    
-  
 
     async def introspection(self, endpoints: List[str]) -> List[str]:
         """
@@ -293,16 +291,8 @@ class vine():
         """
         print()
         self.message.printMsg("Testing for introspection query through Burp proxy", status="success")
-        print()
-        self.message.printMsg("Testing for introspection query", status="success")
-        vulnerable_endpoints = []
-        async with aiohttp.ClientSession() as session:
-            for endpoint in endpoints:
-                result = await self.checkEndpoint(endpoint, session)
-                if result:
-                    vulnerable_endpoints.append(result)
-                return vulnerable_endpoints
-
+        time.sleep(3)
+        
         async with aiohttp.ClientSession() as session:
             tasks = [self.checkEndpoint(endpoint, session) for endpoint in endpoints]
             results = await asyncio.gather(*tasks)
@@ -329,8 +319,6 @@ class vine():
             self.message.printMsg(f"Burp proxy validation failed: {str(e)}", status="error")
             return False
         
-
-    
     async def test(self, proxy_string: str = None, target_ip: str = None):
         """
         Main execution function that coordinates the scanning process.

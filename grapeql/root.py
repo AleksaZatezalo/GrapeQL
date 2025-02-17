@@ -344,7 +344,7 @@ class root():
         
         print()
         self.message.printMsg(f"Testing endpoint {self.endpoint} for DOS attacks", status="success")
-        self.message.printMsg(f"These tests may crach the application. Please proxy in Burp for further Analysis.", status="warning")
+        self.message.printMsg(f"These tests may crach the application. Please proxy in Burp for further analysis.", status="warning")
 
         async with aiohttp.ClientSession() as session:
             tests = [
