@@ -30,3 +30,95 @@ class root():
         self.proxy_url: Optional[str] = None
         self.schema: Optional[Dict] = None
         self.endpoint: Optional[str] = None
+        self.query_type: Optional[str] = None
+        self.types: Dict[str, Dict] = {}
+    
+    def configureProxy(self, proxy_host: str, proxy_port: int):
+        """Configure HTTP proxy settings."""
+        self.proxy_url = f"http://{proxy_host}:{proxy_port}"
+
+    async def runIntrospection(self, session: aiohttp.ClientSession) -> bool:
+        """
+        Run introspection query to get schema information.
+        """
+        query = """
+        query IntrospectionQuery {
+          __schema {
+            queryType {
+              name
+            }
+            types {
+              name
+              fields {
+                name
+                type {
+                  name
+                  kind
+                  ofType {
+                    name
+                    kind
+                  }
+                }
+              }
+            }
+          }
+        }
+        """
+
+        try:
+            async with session.post(
+                self.endpoint,
+                json={'query': query},
+                headers={'Content-Type': 'application/json'},
+                timeout=aiohttp.ClientTimeout(total=10),
+                proxy=self.proxy_url,
+                ssl=False
+            ) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    if result.get('data'):
+                        self.schema = result['data']['__schema']
+                        self.query_type = self.schema['queryType']['name']
+                        
+                        # Process types into a more usable format
+                        for type_info in self.schema['types']:
+                            if type_info.get('fields'):
+                                self.types[type_info['name']] = {
+                                    'fields': type_info['fields']
+                                }
+                        
+                        self.message.printMsg("Successfully retrieved schema", status="log")
+                        return True
+                    
+            self.message.printMsg("Failed to parse introspection result", status="failed")
+            return False
+            
+        except Exception as e:
+            self.message.printMsg(f"Introspection query failed: {str(e)}", status="failed")
+            return False
+
+    async def setEndpoint(self, endpoint: str, proxy_string: Optional[str] = None) -> bool:
+        """
+        Set the endpoint and retrieve its schema through introspection.
+        
+        Args:
+            endpoint: The GraphQL endpoint URL
+            proxy_string: Optional proxy in format "host:port"
+            
+        Returns:
+            bool: True if endpoint was set and schema retrieved successfully
+        """
+        self.endpoint = endpoint
+        
+        # Configure proxy if provided
+        if proxy_string:
+            try:
+                proxy_host, proxy_port = proxy_string.split(':')
+                self.configureProxy(proxy_host, int(proxy_port))
+            except ValueError:
+                self.message.printMsg("Invalid proxy format. Expected host:port", status="failed")
+                return False
+
+        # Run introspection
+        async with aiohttp.ClientSession() as session:
+            return await self.runIntrospection(session)
