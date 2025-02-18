@@ -167,6 +167,7 @@ class vine():
     async def dirb(self, session: aiohttp.ClientSession, base_url: str, path: str) -> Optional[str]:
         """
         Test a single endpoint path for existence on the target URL through Burp proxy.
+        Filters out WebSocket endpoints.
 
         Args:
             session: The aiohttp client session to use for requests
@@ -174,7 +175,7 @@ class vine():
             path: The endpoint path to append to the base URL
 
         Returns:
-            Optional[str]: Full URL if endpoint exists, None otherwise
+            Optional[str]: Full URL if endpoint exists and is not a WebSocket endpoint, None otherwise
         """
         full_url = f"{base_url.rstrip('/')}/{path.lstrip('/')}"
         try:
@@ -185,10 +186,15 @@ class vine():
                 ssl=False  # Required for Burp to intercept HTTPS
             ) as response:
                 if response.status != 404:
-                    return full_url
+                    # Check if response contains WebSocket text
+                    response_text = await response.text()
+                    if "WebSockets request was expected" not in response_text:
+                        return full_url
+                    
         except Exception as e:
             self.message.printMsg(f"Error testing {full_url}: {str(e)}", status="error")
-            return None
+            
+        return None
 
     async def scanEndpoints(self, base_url: str) -> List[str]:
         """
