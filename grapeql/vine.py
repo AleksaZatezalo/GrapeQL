@@ -336,7 +336,6 @@ class vine():
         Returns:
             List[str]: List of vulnerable GraphQL endpoints found
         """
-        self.message.intro()
         
         try:
             # Configure proxy if provided

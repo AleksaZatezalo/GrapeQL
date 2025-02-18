@@ -149,12 +149,6 @@ async def main():
                     proxy=args.proxy if args.proxy else None,
                     use_crush=True
                 )
-            else:
-                await runDosTests(
-                    endpoint=introspection[0],
-                    proxy=args.proxy if args.proxy else None,
-                    use_crush=False
-                )
             
     except Exception as e:
         print(f"Error during scan: {str(e)}")
