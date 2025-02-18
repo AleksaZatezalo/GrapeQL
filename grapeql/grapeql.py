@@ -1,13 +1,14 @@
 """
 Author: Aleksa Zatezalo
-Version: 1.3
+Version: 1.4
 Date: February 2025
-Description: Main file for GrapeQL with command-line argument support and direct API testing
+Description: Main file for GrapeQL with command-line argument support and enhanced DoS testing
 """
 import asyncio
 import argparse
 from vine import vine
 from root import root
+from crush import crush
 from grapePrint import grapePrint
 
 def loadWordlist(wordlist_path):
@@ -56,6 +57,30 @@ async def testSingleEndpoint(scanner: vine, api_url: str, proxy: str = None) -> 
         print(f"Error testing endpoint: {str(e)}")
         return 1
 
+async def runDosTests(endpoint: str, proxy: str = None, use_crush: bool = False):
+    """
+    Run DoS testing using either root or crush class based on the argument.
+    
+    Args:
+        endpoint: The GraphQL endpoint to test
+        proxy: Optional proxy string in host:port format
+        use_crush: Boolean flag to determine whether to use crush instead of root
+    """
+    message = grapePrint()
+    
+    if use_crush:
+        message.printMsg("Using crush for enhanced DoS testing", status="log")
+        dos_tester = crush()
+    else:
+        message.printMsg("Using root for standard DoS testing", status="log")
+        dos_tester = root()
+    
+    # Set the endpoint and get schema
+    if await dos_tester.setEndpoint(endpoint, proxy):
+        await dos_tester.testEndpointDos()
+    else:
+        message.printMsg("Failed to set endpoint or retrieve schema", status="failed")
+
 async def main():
     """
     Main function to handle command-line arguments and perform graphql scanning.
@@ -82,19 +107,27 @@ async def main():
     )
     
     parser.add_argument(
+        '-c', '--crush',
+        action='store_true',
+        help='Use enhanced crush DoS testing instead of root'
+    )
+    
+    parser.add_argument(
         '-w', '--wordlist',
-        help='Path to custom wordlist file containing GraphQL endpoints (one per line)'
+        help='Path to custom wordlist file'
     )
 
     args = parser.parse_args()
     
     try:
         scanner = vine()
+        message = grapePrint()
+        
+        # Print intro banner
+        message.intro()
         
         # Direct API endpoint testing
         if args.api:
-            message = grapePrint()
-            message.intro()
             introspection = await testSingleEndpoint(scanner, args.api, args.proxy)
             
         # Full scan mode
@@ -109,13 +142,19 @@ async def main():
             # Call test with None for proxy if not provided
             introspection = await scanner.test(args.proxy if args.proxy else None, args.target)
         
-        if introspection:            
-            dos_tester = root()
-            # First set the endpoint and get schema
-            if await dos_tester.setEndpoint(introspection[0], args.proxy if args.proxy else None):
-                await dos_tester.testEndpointDos()
+        if introspection:
+            if args.crush:
+                await runDosTests(
+                    endpoint=introspection[0],
+                    proxy=args.proxy if args.proxy else None,
+                    use_crush=True
+                )
             else:
-                print("Failed to set endpoint or retrieve schema")
+                await runDosTests(
+                    endpoint=introspection[0],
+                    proxy=args.proxy if args.proxy else None,
+                    use_crush=False
+                )
             
     except Exception as e:
         print(f"Error during scan: {str(e)}")
@@ -126,4 +165,3 @@ async def main():
 if __name__ == "__main__":
     exit_code = asyncio.run(main())
     exit(exit_code)
-
