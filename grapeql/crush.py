@@ -90,7 +90,6 @@ class crush():
                                     'fields': type_info['fields']
                                 }
                         
-                        self.message.printMsg("Successfully retrieved schema", status="log")
                         return True
                     
             self.message.printMsg("Failed to parse introspection result", status="failed")

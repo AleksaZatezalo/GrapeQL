@@ -28,7 +28,7 @@ def loadWordlist(wordlist_path):
         print(f"Error loading wordlist: {str(e)}")
         return None
 
-async def testSingleEndpoint(scanner: vine, api_url: str, proxy: str = None) -> int:
+async def testSingleEndpoint(scanner, api_url, proxy, message):
     """
     Test a single API endpoint for GraphQL introspection.
     
@@ -69,11 +69,7 @@ async def runDosTests(endpoint: str, proxy: str = None, use_crush: bool = False)
     message = grapePrint()
     
     if use_crush:
-        message.printMsg("Using crush for enhanced DoS testing", status="log")
         dos_tester = crush()
-    else:
-        message.printMsg("Using root for standard DoS testing", status="log")
-        dos_tester = root()
     
     # Set the endpoint and get schema
     if await dos_tester.setEndpoint(endpoint, proxy):
@@ -128,7 +124,7 @@ async def main():
         
         # Direct API endpoint testing
         if args.api:
-            introspection = await testSingleEndpoint(scanner, args.api, args.proxy)
+            introspection = await testSingleEndpoint(scanner, args.api, args.proxy, message)
             
         # Full scan mode
         else:

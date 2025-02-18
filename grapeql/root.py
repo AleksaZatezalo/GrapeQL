@@ -5,18 +5,9 @@ Date: February 2025
 Description: GraphQL DoS testing module with schema-aware query generation
 """
 
-import asyncio
 import aiohttp
 from typing import Dict, List, Optional, Tuple, Any
 from grapePrint import grapePrint
-import time
-
-### TO DO
-# 1. Fingerprint Like GraphW00F
-# 2. Remove Websocket Findings
-# 3. Limit Links
-# 4. Set Introspection DICT
-# 5. Port DDOS Tests To the CRUSH
 
 class root():
     """
