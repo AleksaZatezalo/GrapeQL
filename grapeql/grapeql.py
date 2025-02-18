@@ -109,12 +109,12 @@ async def main():
     parser.add_argument(
         '-c', '--crush',
         action='store_true',
-        help='Use enhanced crush DoS testing instead of root'
+        help='Flag for DoS testing'
     )
     
     parser.add_argument(
         '-w', '--wordlist',
-        help='Path to custom wordlist file'
+        help='Path to custom wordlist file containing GrapQL API endpoints'
     )
 
     args = parser.parse_args()
