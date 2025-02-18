@@ -148,7 +148,7 @@ class root():
                 ]
                 for test_func, engine_name in tests:
                     if await test_func(session):
-                        self.message.printMsg(f"Detected {engine_name} implementation", status="log")
+                        self.message.printMsg(f"Detected {engine_name} implementation", status="success")
                         return engine_name
                         
             self.message.printMsg("Could not identify GraphQL implementation", status="warning")

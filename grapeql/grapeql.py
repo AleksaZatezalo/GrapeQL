@@ -11,6 +11,7 @@ from vine import vine
 from root import root
 from crush import crush
 from grapePrint import grapePrint
+from seeds import Seeds
 
 def loadWordlist(wordlist_path):
     """
@@ -150,7 +151,8 @@ async def main():
     try:
         scanner = vine()
         message = grapePrint()
-        
+        info = Seeds()
+
         # Print intro banner
         message.intro()
         
@@ -175,7 +177,7 @@ async def main():
                 endpoint=introspection[0],
                 proxy=args.proxy if args.proxy else None
                 )
-           
+                      
            if args.crush:
                 await runDosTests(
                     endpoint=introspection[0],
