@@ -232,7 +232,7 @@ class vine():
             List[str]: List of all valid URLs found
         """
         print()
-        self.message.printMsg("Beginning Proxied Directory Busting through Burp", status="success")
+        self.message.printMsg("Beginning Directory Busting", status="success")
         time.sleep(3)
         url_list = []
         for endpoint in valid_endpoints:

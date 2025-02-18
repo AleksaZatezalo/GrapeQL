@@ -4,6 +4,7 @@ Version: 1.4
 Date: February 2025
 Description: Main file for GrapeQL with command-line argument support and enhanced DoS testing
 """
+
 import asyncio
 import argparse
 from vine import vine
@@ -27,6 +28,37 @@ def loadWordlist(wordlist_path):
     except Exception as e:
         print(f"Error loading wordlist: {str(e)}")
         return None
+    
+async def runFingerprinting(endpoint: str, proxy: str = None) -> dict:
+    """
+    Run fingerprinting using the root class.
+    
+    Args:
+        endpoint: The GraphQL endpoint to fingerprint
+        proxy: Optional proxy string in host:port format
+        
+    Returns:
+        dict: Information about the detected engine
+    """
+   
+    fingerprinter = root()
+    
+    try:
+        # Set endpoint and run introspection
+        if await fingerprinter.setEndpoint(endpoint, proxy):
+            # Run fingerprinting
+            engine_id = await fingerprinter.fingerprintEngine()
+            return engine_id
+        
+    except Exception as e:
+        print(f"Error during fingerprinting: {str(e)}")
+        return {
+            'engine': None,
+            'schema_available': False,
+            'endpoint': endpoint,
+            'error': str(e)
+        }
+
 
 async def testSingleEndpoint(scanner, api_url, proxy, message):
     """
@@ -139,7 +171,12 @@ async def main():
             introspection = await scanner.test(args.proxy if args.proxy else None, args.target)
         
         if introspection:
-            if args.crush:
+           await runFingerprinting(
+                endpoint=introspection[0],
+                proxy=args.proxy if args.proxy else None
+                )
+           
+           if args.crush:
                 await runDosTests(
                     endpoint=introspection[0],
                     proxy=args.proxy if args.proxy else None,
