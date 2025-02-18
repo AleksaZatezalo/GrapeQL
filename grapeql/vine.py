@@ -296,7 +296,7 @@ class vine():
             List[str]: List of vulnerable endpoints with introspection enabled
         """
         print()
-        self.message.printMsg("Testing for introspection query through Burp proxy", status="success")
+        self.message.printMsg("Testing for introspection query", status="success")
         time.sleep(3)
         
         async with aiohttp.ClientSession() as session:
