@@ -13,21 +13,35 @@ from grapePrint import grapePrint
 import time
 import socket
 
-class vine():
+
+class vine:
     """
     A class for scanning and identifying GraphQL endpoints with introspection enabled.
     Supports proxying HTTP traffic through Burpsuite while performing direct port scans.
     """
-    
+
     def __init__(self):
         """
         Initialize the vine class with default settings and API endpoints list.
         """
         self.message = grapePrint()
-        self.apiList = ["/graphql", "/graphql/playground", "/graphiql", "/api/explorer", "/graphql/v1", "/graphql/v2", "/graphql/v3", 
-           "/api/graphql/v1", "/api/graphql/v2", "/api/public/graphql", "/api/private/graphql", "/admin/graphql", "/user/graphql"]
+        self.apiList = [
+            "/graphql",
+            "/graphql/playground",
+            "/graphiql",
+            "/api/explorer",
+            "/graphql/v1",
+            "/graphql/v2",
+            "/graphql/v3",
+            "/api/graphql/v1",
+            "/api/graphql/v2",
+            "/api/public/graphql",
+            "/api/private/graphql",
+            "/admin/graphql",
+            "/user/graphql",
+        ]
         self.proxy_url: Optional[str] = None
-        
+
     def configureProxy(self, proxy_host: str, proxy_port: int):
         """
         Configure the HTTP proxy settings for Burpsuite.
@@ -37,7 +51,7 @@ class vine():
             proxy_port: The proxy server port
         """
         self.proxy_url = f"http://{proxy_host}:{proxy_port}"
-    
+
     def setApiList(self, endpoints: List[str]) -> bool:
         """
         Set a custom list of API endpoints to scan.
@@ -55,7 +69,9 @@ class vine():
         try:
             # Validate input is a list
             if not isinstance(endpoints, list):
-                self.message.printMsg("Error: Endpoints must be provided as a list", status="error")
+                self.message.printMsg(
+                    "Error: Endpoints must be provided as a list", status="error"
+                )
                 return False
 
             # Validate each endpoint
@@ -63,29 +79,36 @@ class vine():
             for endpoint in endpoints:
                 # Check if endpoint is a string
                 if not isinstance(endpoint, str):
-                    self.message.printMsg(f"Warning: Skipping invalid endpoint: {endpoint}", status="warning")
+                    self.message.printMsg(
+                        f"Warning: Skipping invalid endpoint: {endpoint}",
+                        status="warning",
+                    )
                     continue
 
                 # Clean the endpoint
                 cleaned = endpoint.strip()
-                
+
                 # Ensure endpoint starts with /
-                if not cleaned.startswith('/'):
-                    cleaned = '/' + cleaned
+                if not cleaned.startswith("/"):
+                    cleaned = "/" + cleaned
 
                 # Remove any trailing slashes
-                cleaned = cleaned.rstrip('/')
+                cleaned = cleaned.rstrip("/")
 
                 cleaned_endpoints.append(cleaned)
 
             # Check if we have any valid endpoints
             if not cleaned_endpoints:
-                self.message.printMsg("Error: No valid endpoints provided", status="error")
+                self.message.printMsg(
+                    "Error: No valid endpoints provided", status="error"
+                )
                 return False
 
             # Set the new API list
             self.apiList = cleaned_endpoints
-            self.message.printMsg(f"Successfully set {len(cleaned_endpoints)} endpoints", status="success")
+            self.message.printMsg(
+                f"Successfully set {len(cleaned_endpoints)} endpoints", status="success"
+            )
             return True
 
         except Exception as e:
@@ -112,7 +135,9 @@ class vine():
         except:
             return False
 
-    async def scanPortRange(self, host: str, start_port: int, end_port: int) -> List[int]:
+    async def scanPortRange(
+        self, host: str, start_port: int, end_port: int
+    ) -> List[int]:
         """
         Scan a range of ports concurrently on the target host (direct connection).
 
@@ -127,15 +152,15 @@ class vine():
         tasks = []
         for port in range(start_port, end_port + 1):
             tasks.append(self.testPortNumber(host, port))
-        
+
         results = await asyncio.gather(*tasks)
-        
+
         open_ports = []
         for port, is_open in zip(range(start_port, end_port + 1), results):
             if is_open:
-                self.message.printMsg(f'{host}:{port} [OPEN]')
+                self.message.printMsg(f"{host}:{port} [OPEN]")
                 open_ports.append(port)
-        
+
         return open_ports
 
     async def scanIP(self, host: str = "127.0.0.1") -> List[int]:
@@ -150,15 +175,17 @@ class vine():
         """
         chunk_size = 1000
         open_ports = []
-        
+
         for start_port in range(1, 65536, chunk_size):
             end_port = min(start_port + chunk_size - 1, 65535)
             chunk_results = await self.scanPortRange(host, start_port, end_port)
             open_ports.extend(chunk_results)
-        
+
         return sorted(open_ports)
 
-    async def dirb(self, session: aiohttp.ClientSession, base_url: str, path: str) -> Optional[str]:
+    async def dirb(
+        self, session: aiohttp.ClientSession, base_url: str, path: str
+    ) -> Optional[str]:
         """
         Test a single endpoint path for existence on the target URL through Burp proxy.
         Filters out WebSocket endpoints.
@@ -177,17 +204,17 @@ class vine():
                 full_url,
                 timeout=aiohttp.ClientTimeout(total=5),
                 proxy=self.proxy_url,
-                ssl=False  # Required for Burp to intercept HTTPS
+                ssl=False,  # Required for Burp to intercept HTTPS
             ) as response:
                 if response.status != 404:
                     # Check if response contains WebSocket text
                     response_text = await response.text()
                     if "WebSockets request was expected" not in response_text:
                         return full_url
-                    
+
         except Exception as e:
             self.message.printMsg(f"Error testing {full_url}: {str(e)}", status="error")
-            
+
         return None
 
     async def scanEndpoints(self, base_url: str) -> List[str]:
@@ -215,7 +242,7 @@ class vine():
         Returns:
             List[str]: List of URLs constructed from open ports
         """
-        
+
         self.message.printMsg("Beginning Direct Port Scan", status="success")
         time.sleep(3)
         ports = await self.scanIP(host=ip)
@@ -231,7 +258,7 @@ class vine():
         Returns:
             List[str]: List of all valid URLs found
         """
-        
+
         self.message.printMsg("Started directory busting", status="success")
         time.sleep(3)
         url_list = []
@@ -242,7 +269,9 @@ class vine():
                 url_list.append(url)
         return url_list
 
-    async def checkEndpoint(self, endpoint: str, session: aiohttp.ClientSession) -> Optional[str]:
+    async def checkEndpoint(
+        self, endpoint: str, session: aiohttp.ClientSession
+    ) -> Optional[str]:
         """
         Test a single endpoint for GraphQL introspection vulnerability through Burp proxy.
 
@@ -266,18 +295,21 @@ class vine():
         try:
             async with session.post(
                 endpoint,
-                json={'query': query},
-                headers={'Content-Type': 'application/json'},
+                json={"query": query},
+                headers={"Content-Type": "application/json"},
                 timeout=aiohttp.ClientTimeout(total=5),
                 proxy=self.proxy_url,
-                ssl=False  # Required for Burp to intercept HTTPS
+                ssl=False,  # Required for Burp to intercept HTTPS
             ) as response:
                 if response.status == 200:
                     try:
                         result = await response.json()
                         if result and isinstance(result, dict):
-                            if result.get('data', {}).get('__schema'):
-                                self.message.printMsg(f"Introspection enabled: {endpoint}", status="warning")
+                            if result.get("data", {}).get("__schema"):
+                                self.message.printMsg(
+                                    f"Introspection enabled: {endpoint}",
+                                    status="warning",
+                                )
                                 return endpoint
                     except (aiohttp.ContentTypeError, ValueError):
                         pass
@@ -298,7 +330,7 @@ class vine():
 
         self.message.printMsg("Testing for introspection query", status="success")
         time.sleep(3)
-        
+
         async with aiohttp.ClientSession() as session:
             tasks = [self.checkEndpoint(endpoint, session) for endpoint in endpoints]
             results = await asyncio.gather(*tasks)
@@ -322,9 +354,11 @@ class vine():
             sock.close()
             return True
         except Exception as e:
-            self.message.printMsg(f"Burp proxy validation failed: {str(e)}", status="error")
+            self.message.printMsg(
+                f"Burp proxy validation failed: {str(e)}", status="error"
+            )
             return False
-        
+
     async def test(self, proxy_string: str = None, target_ip: str = None):
         """
         Main execution function that coordinates the scanning process.
@@ -336,29 +370,35 @@ class vine():
         Returns:
             List[str]: List of vulnerable GraphQL endpoints found
         """
-        
+
         try:
             # Configure proxy if provided
             if proxy_string:
                 try:
-                    proxy_host, proxy_port_str = proxy_string.split(':')
+                    proxy_host, proxy_port_str = proxy_string.split(":")
                     proxy_port = int(proxy_port_str)
-                    
+
                     # Validate and configure proxy
                     if not self.validate_proxy(proxy_host, proxy_port):
-                        self.message.printMsg("Cannot connect to proxy. Please ensure proxy is running and settings are correct.", status="error")
+                        self.message.printMsg(
+                            "Cannot connect to proxy. Please ensure proxy is running and settings are correct.",
+                            status="error",
+                        )
                         return []
-                        
+
                     self.configureProxy(proxy_host, proxy_port)
                 except ValueError:
-                    self.message.printMsg("Invalid proxy string format. Expected format: host:port", status="error")
+                    self.message.printMsg(
+                        "Invalid proxy string format. Expected format: host:port",
+                        status="error",
+                    )
                     return []
-            
+
             # Perform scan using provided target IP
             valid_endpoints = await self.constructAddress(target_ip)
             url_list = await self.dirbList(valid_endpoints)
             return await self.introspection(url_list)
-            
+
         except Exception as e:
             self.message.printMsg(f"Error during scan: {str(e)}", status="error")
             return []
