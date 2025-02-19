@@ -7,10 +7,8 @@ Description: GraphQL Security Testing Module
 
 import aiohttp
 import asyncio
-import json
 from typing import Dict, List, Optional, Tuple, Any
 from grapePrint import grapePrint
-from urllib.parse import urlencode
 
 class seeds():
     """
@@ -126,11 +124,10 @@ class seeds():
 
     async def checkFieldSuggestions(self, session: aiohttp.ClientSession) -> Dict:
         """Check if field suggestions are enabled."""
-        
         res = {
             'result': False,
-            'title': 'Field Suggestions',
-            'description': 'Field Suggestions are Enabled',
+            'title': 'Field suggestions are enabled',
+            'description': 'Field Suggestions are enabled',
             'impact': 'Information Leakage - /' + self.endpoint.rsplit('/', 1)[-1],
             'severity': 'LOW',
             'color': 'blue',
@@ -145,14 +142,12 @@ class seeds():
         res['curl_verify'] = self.generateCurl()
         
         try:
-            response_data = await response.json()
-            if 'Did you mean' in self.getError(response_data):
+            if 'Did you mean' in str(response_data['errors']):
                 res['result'] = True
         except:
             pass
-
         if res['result']:
-            self.message.printMsg(f"Found vulnerability: {res['title']}", status="warning")
+            self.message.printMsg(f"Low vulnerability: {res['title']}", status="warning")
         return res
 
     async def checkGetBasedMutation(self, session: aiohttp.ClientSession) -> Dict:
@@ -180,7 +175,7 @@ class seeds():
             pass
 
         if res['result']:
-            self.message.printMsg(f"Found vulnerability: {res['title']}", status="warning")
+            self.message.printMsg(f"Low vulnerability: {res['title']}", status="warning")
         return res
 
     async def checkGetMethodSupport(self, session: aiohttp.ClientSession) -> Dict:
@@ -218,7 +213,7 @@ class seeds():
             self.message.printMsg(f"Error in GET method check: {str(e)}", status="failed")
 
         if res['result']:
-            self.message.printMsg(f"Found vulnerability: {res['title']}", status="warning")
+            self.message.printMsg(f"Low vulnerability: {res['title']}", status="warning")
         return res
 
     async def checkPostBasedCsrf(self, session: aiohttp.ClientSession) -> Dict:
@@ -268,7 +263,7 @@ class seeds():
                 del self.headers['Content-Type']
 
         if res['result']:
-            self.message.printMsg(f"Found vulnerability: {res['title']}", status="warning")
+            self.message.printMsg(f"Low vulnerability: {res['title']}", status="warning")
         return res
 
     async def runAllChecks(self) -> List[Dict]:
