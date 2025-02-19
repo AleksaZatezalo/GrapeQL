@@ -5,7 +5,8 @@ Date: February 2025
 Description: Module for authentication testing. 
 """
 
-class guard():
+
+class guard:
 
     def __init__():
         pass

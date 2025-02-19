@@ -5,7 +5,8 @@ Date: February 2025
 Description: Module to test for command injection, sql injections, and other injection attacks. 
 """
 
-class juice():
+
+class juice:
 
     def __init__():
         pass
