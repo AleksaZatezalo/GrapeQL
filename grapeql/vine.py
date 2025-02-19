@@ -232,7 +232,7 @@ class vine():
             List[str]: List of all valid URLs found
         """
         
-        self.message.printMsg("Started Directory Busting", status="success")
+        self.message.printMsg("Started directory busting", status="success")
         time.sleep(3)
         url_list = []
         for endpoint in valid_endpoints:
