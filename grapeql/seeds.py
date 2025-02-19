@@ -7,7 +7,7 @@ Description: GraphQL Security Testing Module
 
 import aiohttp
 import asyncio
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional
 from grapePrint import grapePrint
 
 class seeds():

@@ -4,6 +4,7 @@ Version: 1.0
 Date: October 2024
 Description: ASCII Art and 'graphics' for GrapeQL. 
 """
+
 import time
 
 class grapePrint():

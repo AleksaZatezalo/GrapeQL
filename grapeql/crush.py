@@ -7,7 +7,7 @@ Description: GraphQL DoS testing module with schema-aware query generation
 
 import asyncio
 import aiohttp
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple
 from grapePrint import grapePrint
 import time
 
