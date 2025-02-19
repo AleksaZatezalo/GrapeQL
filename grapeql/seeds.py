@@ -2,7 +2,7 @@
 Author: Aleksa Zatezalo
 Version: 1.0
 Date: February 2025
-Description: GraphQL Security Testing Module
+Description: GraphQL security testing module for informational issues.
 """
 
 import aiohttp

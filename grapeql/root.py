@@ -2,7 +2,7 @@
 Version: 1.0
 Author: Aleksa Zatezalo
 Date: February 2025
-Description: GraphQL DoS testing module with schema-aware query generation
+Description: GraphQL fingerprinting module with schema-aware query generation
 """
 
 import aiohttp
