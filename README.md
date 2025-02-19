@@ -31,7 +31,7 @@ Let me analyze the code and rewrite the Features section to accurately reflect t
 - Introspection query testing to identify vulnerable endpoints
 - Custom endpoint list configuration
 
-### 2. Root Analysis: GraphQL Engine Detection (root.py)
+### 2. Root Analysis: GraphQL Engine Detection
 
 - Comprehensive GraphQL server implementation fingerprinting
 - Support for detecting 25+ GraphQL engines including:
@@ -46,7 +46,19 @@ Let me analyze the code and rewrite the Features section to accurately reflect t
 - Custom query generation for engine identification
 - Proxy-aware implementation testing
 
-### 3. Crush: DoS Vulnerability Testing
+### 3. Seeds: CSRF and Method Testing
+
+- Field suggestion vulnerability detection
+- GET-based mutation testing for CSRF vulnerabilities
+- Query method support analysis
+- POST-based CSRF testing with different content types
+- Detailed vulnerability reporting including:
+- Severity classification
+- Impact assessment
+- Verification commands (curl)
+- Vulnerability descriptions
+
+### 4. Crush: DoS Vulnerability Testing
 
 - Schema-aware query generation for targeted testing
 - Circular query vulnerability detection
