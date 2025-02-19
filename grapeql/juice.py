@@ -7,11 +7,12 @@ Description: Module to test for command injection, sql injections, and other inj
 
 import aiohttp
 
+
 class juice:
 
     def __init__():
         pass
-    
+
     def configureProxy(self, proxy_host: str, proxy_port: int):
         """Configure HTTP proxy settings."""
         self.proxy_url = f"http://{proxy_host}:{proxy_port}"
