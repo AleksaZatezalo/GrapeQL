@@ -67,7 +67,7 @@ class vine:
             scanner = vine()
             scanner.setApiList(['/graphql', '/api/graphql', '/v1/graphql'])
         """
-        
+
         try:
             # Validate input is a list
             if not isinstance(endpoints, list):
@@ -128,7 +128,7 @@ class vine:
         Returns:
             bool: True if port is open, False otherwise
         """
-        
+
         try:
             future = asyncio.open_connection(host, port)
             _, writer = await asyncio.wait_for(future, timeout=0.5)
@@ -203,7 +203,7 @@ class vine:
         Returns:
             Optional[str]: Full URL if endpoint exists and is not a WebSocket endpoint, None otherwise
         """
-        
+
         full_url = f"{base_url.rstrip('/')}/{path.lstrip('/')}"
         try:
             async with session.get(
@@ -233,7 +233,7 @@ class vine:
         Returns:
             List[str]: List of valid endpoint URLs found
         """
-        
+
         async with aiohttp.ClientSession() as session:
             tasks = [self.dirb(session, base_url, path) for path in self.apiList]
             results = await asyncio.gather(*tasks)
@@ -289,7 +289,7 @@ class vine:
         Returns:
             Optional[str]: Endpoint URL if vulnerable, None otherwise
         """
-        
+
         query = """
         query {
             __schema {
@@ -355,7 +355,7 @@ class vine:
         Returns:
             bool: True if proxy is valid and accessible, False otherwise
         """
-        
+
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(5)

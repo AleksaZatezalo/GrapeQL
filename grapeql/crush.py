@@ -31,7 +31,6 @@ class crush:
     def printVulnerabilityDetails(
         self, vuln_type: str, is_vulnerable: bool, duration: float
     ):
-
         """Print detailed information about the vulnerability test results."""
 
         if is_vulnerable:

@@ -217,7 +217,7 @@ class root:
 
     async def testHasura(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running Hasura."""
-        
+
         query = """query @cached { __typename }"""
         response = await self._graphql_request(session, query)
         if response.get("data", {}).get("__typename") == "query_root":
@@ -501,21 +501,21 @@ class root:
 
     async def testAgoo(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running Agoo."""
-        
+
         query = "query { zzz }"
         response = await self._graphql_request(session, query)
         return self._error_contains(response, "eval error", part="code")
 
     async def testMercurius(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running Mercurius."""
-        
+
         query = ""
         response = await self._graphql_request(session, query)
         return self._error_contains(response, "Unknown query")
 
     async def testMorpheus(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running Morpheus."""
-        
+
         query = "queryy { __typename }"
         response = await self._graphql_request(session, query)
         return self._error_contains(
@@ -524,7 +524,7 @@ class root:
 
     async def testLacinia(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running Lacinia."""
-        
+
         query = "query { graphw00f }"
         response = await self._graphql_request(session, query)
         return self._error_contains(
@@ -539,7 +539,7 @@ class root:
 
     async def testCaliban(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running Caliban."""
-        
+
         query = """
         query {
             __typename
@@ -557,7 +557,7 @@ class root:
         self, session: aiohttp.ClientSession, query: str, operation: str = None
     ) -> Dict:
         """Helper method to make GraphQL requests."""
-        
+
         payload = {"query": query}
         if operation:
             payload["operation"] = operation
