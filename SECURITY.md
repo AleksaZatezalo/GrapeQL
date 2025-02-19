@@ -6,7 +6,7 @@ If you discover a security vulnerability, please help us maintain the safety and
 
 - **Email:** [zabumaphu@gmail.com](mailto:zabumaphu@gmail.com)
 - **Subject:** "Security Vulnerability Report"
-- **Include:** 
+- **Include:**
   - A detailed description of the vulnerability.
   - Steps to reproduce the issue.
   - Potential impact and severity assessment.
