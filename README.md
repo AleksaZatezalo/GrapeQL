@@ -68,83 +68,10 @@ GrapeQL is a comprehensive GraphQL security assessment toolkit designed to help 
 - Resource allocation testing
 - Batch operation stress testing
 
-## Installation
-
-### Prerequisites
-
-```bash
-# Required
-Python 3.7+
-pip package manager
-
-# Optional
-Docker (for isolated testing)
-Burp Suite (for proxy integration)
-```
-
-### Basic Installation
-
-```bash
-pip install grapeql
-```
-
-### Development Installation
-
-```bash
-git clone https://github.com/AleksaZatezalo/grapeql
-cd grapeql
-```
-
-## Security Recommendations
-
-### Implementation Guidelines
-
-1. Enable authentication for all sensitive queries
-2. Implement proper rate limiting
-3. Set query depth limits
-4. Use query complexity analysis
-5. Implement proper error handling
-6. Enable logging and monitoring
-
-## Best Practices
-
-### Testing Methodology
-
-1. Start with non-intrusive tests
-2. Gradually increase test complexity
-3. Monitor system response
-4. Document all findings
-5. Validate results manually
-
-### Risk Mitigation
-
-1. Test in staging environments first
-2. Have rollback procedures ready
-3. Monitor system resources
-4. Maintain audit logs
-5. Have incident response plans
-
-## Contributing
-
-We welcome contributions to GrapeQL! Please follow these steps:
-
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new features
-4. Submit a pull request
-5. Follow our code of conduct
-
-## License
-
-GrapeQL is licensed under the MIT License. See LICENSE file for details.
-
-## A Note on Responsible Testing
-
-GrapeQL is a powerful testing tool. Always ensure you have explicit permission to test target systems and use the tool responsibly.
-
 ## Why GrapeQL?
 
 Like a bunch of grapes, GraphQL endpoints have many interconnected parts that need to be tested thoroughly. GrapeQL tests each "grape" (component) while understanding how they connect to form the whole cluster (API). Our tool is designed to be sweet and simple to use, while providing comprehensive coverage.
+
 ## Donation Link
 
 If you have benefited from this project and use Monero please consider donanting to the following address:
