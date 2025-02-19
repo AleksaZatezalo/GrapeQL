@@ -19,6 +19,7 @@ class seeds:
 
     def __init__(self):
         """Initialize the security tester with default settings and printer."""
+
         self.message = grapePrint()
         self.proxy_url: Optional[str] = None
         self.endpoint: Optional[str] = None
@@ -27,6 +28,7 @@ class seeds:
 
     def configureProxy(self, proxy_host: str, proxy_port: int):
         """Configure HTTP proxy settings."""
+
         self.proxy_url = f"http://{proxy_host}:{proxy_port}"
 
     def getError(self, response_data: Dict) -> str:
@@ -39,6 +41,7 @@ class seeds:
 
     def generateCurl(self) -> str:
         """Generate curl command from request."""
+
         if not hasattr(self, "last_response"):
             return ""
 
@@ -67,6 +70,7 @@ class seeds:
         self, session: aiohttp.ClientSession, payload: str
     ) -> Dict:
         """Make a GraphQL query."""
+
         async with session.post(
             self.endpoint,
             json={"query": payload},
@@ -83,6 +87,7 @@ class seeds:
         self, session: aiohttp.ClientSession, method: str = "GET", **kwargs
     ) -> Dict:
         """Make an HTTP request."""
+
         async with session.request(
             method,
             self.endpoint,
@@ -96,6 +101,7 @@ class seeds:
 
     async def runIntrospection(self, session: aiohttp.ClientSession) -> bool:
         """Run introspection query to validate the GraphQL endpoint."""
+
         query = """
         query {
             __schema {
@@ -127,6 +133,7 @@ class seeds:
         self, endpoint: str, proxy_string: Optional[str] = None
     ) -> bool:
         """Set the endpoint and configure proxy if provided."""
+
         self.endpoint = endpoint
 
         if proxy_string:
@@ -144,6 +151,7 @@ class seeds:
 
     async def checkFieldSuggestions(self, session: aiohttp.ClientSession) -> Dict:
         """Check if field suggestions are enabled."""
+
         res = {
             "result": False,
             "title": "Field suggestions are enabled",
@@ -174,6 +182,7 @@ class seeds:
 
     async def checkGetBasedMutation(self, session: aiohttp.ClientSession) -> Dict:
         """Check if mutations are allowed over GET."""
+
         res = {
             "result": False,
             "title": "Mutation is allowed over GET (possible CSRF)",
@@ -205,6 +214,7 @@ class seeds:
 
     async def checkGetMethodSupport(self, session: aiohttp.ClientSession) -> Dict:
         """Check for GET method query support."""
+
         res = {
             "result": False,
             "title": "Queries allowed using GET requests (possible CSRF)",
@@ -250,6 +260,7 @@ class seeds:
 
     async def checkPostBasedCsrf(self, session: aiohttp.ClientSession) -> Dict:
         """Check for POST-based CSRF vulnerabilities."""
+
         res = {
             "result": False,
             "title": "POST based url-encoded query (possible CSRF)",
@@ -307,6 +318,7 @@ class seeds:
 
     async def runAllChecks(self) -> List[Dict]:
         """Run all security checks and return results."""
+
         if not self.endpoint:
             self.message.printMsg("Endpoint not set", status="failed")
             return []

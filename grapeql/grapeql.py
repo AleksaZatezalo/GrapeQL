@@ -24,6 +24,7 @@ def loadWordlist(wordlist_path):
     Returns:
         list: List of endpoints from the file
     """
+
     try:
         with open(wordlist_path, "r") as f:
             return [line.strip() for line in f if line.strip()]
@@ -75,6 +76,7 @@ async def testSingleEndpoint(scanner, api_url, proxy, message):
     Returns:
         int: Exit code (0 for success, 1 for failure)
     """
+
     try:
         # Configure proxy if provided
         if proxy:
@@ -102,6 +104,7 @@ async def runDosTests(endpoint: str, proxy: str = None, use_crush: bool = False)
         proxy: Optional proxy string in host:port format
         use_crush: Boolean flag to determine whether to use crush instead of root
     """
+
     message = grapePrint()
 
     if use_crush:
@@ -118,6 +121,7 @@ async def main():
     """
     Main function to handle command-line arguments and perform graphql scanning.
     """
+
     parser = argparse.ArgumentParser(
         description="GraphQL Endpoint Scanner with Optional Proxy Support",
         formatter_class=argparse.RawDescriptionHelpFormatter,

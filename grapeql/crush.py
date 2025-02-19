@@ -20,6 +20,7 @@ class crush:
 
     def __init__(self):
         """Initialize the DoS tester with default settings and printer."""
+
         self.message = grapePrint()
         self.proxy_url: Optional[str] = None
         self.schema: Optional[Dict] = None
@@ -30,7 +31,9 @@ class crush:
     def printVulnerabilityDetails(
         self, vuln_type: str, is_vulnerable: bool, duration: float
     ):
+
         """Print detailed information about the vulnerability test results."""
+
         if is_vulnerable:
             self.message.printMsg(
                 f"Endpoint is VULNERABLE to {vuln_type}!", status="failed"
@@ -48,12 +51,14 @@ class crush:
 
     def configureProxy(self, proxy_host: str, proxy_port: int):
         """Configure HTTP proxy settings."""
+
         self.proxy_url = f"http://{proxy_host}:{proxy_port}"
 
     async def runIntrospection(self, session: aiohttp.ClientSession) -> bool:
         """
         Run introspection query to get schema information.
         """
+
         query = """
         query IntrospectionQuery {
           __schema {
@@ -118,6 +123,7 @@ class crush:
         Generate a deeply nested circular query based on schema types that reference each other.
         Creates a complex recursive query pattern to test for DoS vulnerabilities.
         """
+
         if not self.schema:
             return ""
 
@@ -184,6 +190,7 @@ class crush:
         """
         Generate a query with duplicated fields based on schema.
         """
+
         if not self.query_type or not self.types.get(self.query_type):
             return ""
 
@@ -205,6 +212,7 @@ class crush:
         """
         Generate a deeply nested query based on schema types.
         """
+
         if not self.query_type or not self.types.get(self.query_type):
             return ""
 
@@ -236,6 +244,7 @@ class crush:
         """
         Generate a batch of queries based on schema.
         """
+
         if not self.query_type or not self.types.get(self.query_type):
             return []
 
@@ -263,6 +272,7 @@ class crush:
         Generate a query that attempts to overload the system by creating deep directory-like structures.
         Creates deeply nested fragments and type combinations to stress the resolver.
         """
+
         if not self.schema or not self.types:
             return ""
 
@@ -347,6 +357,7 @@ class crush:
         self, session: aiohttp.ClientSession
     ) -> Tuple[bool, float]:
         """Test for directory overloading vulnerability using schema-based query."""
+
         query = self.generateDirectoryOverload()
         if not query:
             return False, 0.0
@@ -382,6 +393,7 @@ class crush:
         Returns:
             bool: True if endpoint was set and schema retrieved successfully
         """
+
         self.endpoint = endpoint
 
         # Configure proxy if provided
@@ -403,6 +415,7 @@ class crush:
         self, session: aiohttp.ClientSession
     ) -> Tuple[bool, float]:
         """Test for circular query vulnerability using schema-based query."""
+
         query = self.generateCircularQuery()
         if not query:
             return False, 0.0
@@ -429,6 +442,7 @@ class crush:
         self, session: aiohttp.ClientSession
     ) -> Tuple[bool, float]:
         """Test for field duplication vulnerability using schema-based query."""
+
         query = self.generateFieldDuplication()
         if not query:
             return False, 0.0
@@ -455,6 +469,7 @@ class crush:
         self, session: aiohttp.ClientSession
     ) -> Tuple[bool, float]:
         """Test for array batching vulnerability using schema-based query."""
+
         queries = self.generateArrayBatching()
         if not queries:
             return False, 0.0
@@ -481,6 +496,7 @@ class crush:
         """
         Test the endpoint for all DoS vulnerabilities using schema-based queries.
         """
+
         if not self.endpoint or not self.schema:
             self.message.printMsg(
                 "No endpoint set or schema not retrieved. Run setEndpoint first.",

@@ -92,6 +92,7 @@ class root:
         Returns:
             bool: True if endpoint was set and schema retrieved successfully
         """
+
         self.endpoint = endpoint
 
         # Configure proxy if provided
@@ -116,6 +117,7 @@ class root:
         Returns:
             Optional[str]: Engine identifier if detected
         """
+
         if not self.endpoint:
             self.message.printMsg(
                 "No endpoint set. Call setEndpoint first.", status="error"
@@ -177,6 +179,7 @@ class root:
 
     async def testYoga(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running GraphQL Yoga."""
+
         query = """subscription { __typename }"""
         response = await self._graphql_request(session, query)
         return self._error_contains(
@@ -200,18 +203,21 @@ class root:
 
     async def testAwsAppsync(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running AWS AppSync."""
+
         query = "query @skip { __typename }"
         response = await self._graphql_request(session, query)
         return self._error_contains(response, "MisplacedDirective")
 
     async def testGraphene(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running Graphene."""
+
         query = "aaa"
         response = await self._graphql_request(session, query)
         return self._error_contains(response, "Syntax Error GraphQL (1:1)")
 
     async def testHasura(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running Hasura."""
+        
         query = """query @cached { __typename }"""
         response = await self._graphql_request(session, query)
         if response.get("data", {}).get("__typename") == "query_root":
@@ -235,6 +241,7 @@ class root:
 
     async def testGraphqlPhp(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running GraphQL PHP."""
+
         query = "query ! { __typename }"
         response = await self._graphql_request(session, query)
         if self._error_contains(
@@ -250,6 +257,7 @@ class root:
 
     async def testRuby(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running Ruby GraphQL."""
+
         query = "query @skip { __typename }"
         response = await self._graphql_request(session, query)
         if self._error_contains(response, "'@skip' can't be applied to queries"):
@@ -270,6 +278,7 @@ class root:
 
     async def testHyperGraphql(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running HyperGraphQL."""
+
         query = "zzz { __typename }"
         response = await self._graphql_request(session, query)
         if self._error_contains(
@@ -286,6 +295,7 @@ class root:
 
     async def testGraphqlJava(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running GraphQL Java."""
+
         query = "queryy { __typename }"
         response = await self._graphql_request(session, query)
         if self._error_contains(response, "Invalid Syntax : offending token 'queryy'"):
@@ -306,6 +316,7 @@ class root:
 
     async def testAriadne(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running Ariadne."""
+
         query = "query { __typename @abc }"
         response = await self._graphql_request(session, query)
         if (
@@ -320,6 +331,7 @@ class root:
 
     async def testGraphqlApiForWp(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running GraphQL API for WP."""
+
         query = "query { alias1$1:__typename }"
         response = await self._graphql_request(session, query)
         if response.get("data", {}).get("alias1$1") == "QueryRoot":
@@ -336,6 +348,7 @@ class root:
 
     async def testWpGraphql(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running WPGraphQL."""
+
         query = ""
         response = await self._graphql_request(session, query)
         if self._error_contains(
@@ -354,6 +367,7 @@ class root:
 
     async def testGqlgen(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running gqlgen."""
+
         query = "query { __typename { }"
         response = await self._graphql_request(session, query)
         if self._error_contains(response, "expected at least one definition"):
@@ -381,6 +395,7 @@ class root:
 
     async def testJuniper(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running Juniper."""
+
         query = "queryy { __typename }"
         response = await self._graphql_request(session, query)
         if self._error_contains(response, 'Unexpected "queryy"'):
@@ -392,6 +407,7 @@ class root:
 
     async def testSangria(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running Sangria."""
+
         query = "queryy { __typename }"
         response = await self._graphql_request(session, query)
         return (
@@ -401,6 +417,7 @@ class root:
 
     async def testFlutter(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running Flutter."""
+
         query = "query { __typename @deprecated }"
         response = await self._graphql_request(session, query)
         return self._error_contains(
@@ -409,6 +426,7 @@ class root:
 
     async def testDianaJl(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running Diana.jl."""
+
         query = "queryy { __typename }"
         response = await self._graphql_request(session, query)
         return self._error_contains(
@@ -417,6 +435,7 @@ class root:
 
     async def testStrawberry(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running Strawberry."""
+
         query = "query @deprecated { __typename }"
         response = await self._graphql_request(session, query)
         return (
@@ -428,6 +447,7 @@ class root:
 
     async def testTartiflette(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running Tartiflette."""
+
         query = "query @a { __typename }"
         response = await self._graphql_request(session, query)
         if self._error_contains(response, "Unknow Directive < @a >."):
@@ -441,12 +461,14 @@ class root:
 
     async def testTailcall(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running Tailcall."""
+
         query = "aa { __typename }"
         response = await self._graphql_request(session, query)
         return self._error_contains(response, "expected executable_definition")
 
     async def testDgraph(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running Dgraph."""
+
         query = "query { __typename @cascade }"
         response = await self._graphql_request(session, query)
         if response.get("data", {}).get("__typename") == "Query":
@@ -460,6 +482,7 @@ class root:
 
     async def testDirectus(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running Directus."""
+
         query = ""
         response = await self._graphql_request(session, query)
         errors = response.get("errors", [])
@@ -469,6 +492,7 @@ class root:
 
     async def testLighthouse(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running Lighthouse."""
+
         query = "query { __typename @include(if: falsee) }"
         response = await self._graphql_request(session, query)
         return self._error_contains(
@@ -477,18 +501,21 @@ class root:
 
     async def testAgoo(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running Agoo."""
+        
         query = "query { zzz }"
         response = await self._graphql_request(session, query)
         return self._error_contains(response, "eval error", part="code")
 
     async def testMercurius(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running Mercurius."""
+        
         query = ""
         response = await self._graphql_request(session, query)
         return self._error_contains(response, "Unknown query")
 
     async def testMorpheus(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running Morpheus."""
+        
         query = "queryy { __typename }"
         response = await self._graphql_request(session, query)
         return self._error_contains(
@@ -497,6 +524,7 @@ class root:
 
     async def testLacinia(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running Lacinia."""
+        
         query = "query { graphw00f }"
         response = await self._graphql_request(session, query)
         return self._error_contains(
@@ -511,6 +539,7 @@ class root:
 
     async def testCaliban(self, session: aiohttp.ClientSession) -> bool:
         """Test if the endpoint is running Caliban."""
+        
         query = """
         query {
             __typename
@@ -528,6 +557,7 @@ class root:
         self, session: aiohttp.ClientSession, query: str, operation: str = None
     ) -> Dict:
         """Helper method to make GraphQL requests."""
+        
         payload = {"query": query}
         if operation:
             payload["operation"] = operation
@@ -546,5 +576,6 @@ class root:
 
     def _error_contains(self, response_data: Dict, error_text: str) -> bool:
         """Helper method to check if a response contains a specific error message."""
+
         errors = response_data.get("errors", [])
         return any(error_text in error.get("message", "") for error in errors)
