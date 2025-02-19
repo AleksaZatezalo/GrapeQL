@@ -7,6 +7,7 @@ Description: Main file for GrapeQL with command-line argument support and enhanc
 
 import asyncio
 import argparse
+import time
 from vine import vine
 from root import root
 from crush import crush
@@ -182,10 +183,12 @@ async def main():
             )
 
         if introspection:
+            time.sleep(2)
             await runFingerprinting(
                 endpoint=introspection[0], proxy=args.proxy if args.proxy else None
             )
 
+            time.sleep(2)
             await seed.setEndpoint(introspection[0])
             await seed.runAllChecks()
 
