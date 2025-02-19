@@ -15,58 +15,50 @@ GrapeQL is a comprehensive GraphQL security assessment toolkit designed to help 
       .    .    .      
 ```
 
+Let me analyze the code and rewrite the Features section to accurately reflect the implemented classes.
+
+
+
 ## Features
 
-### 1. Endpoint Harvesting (The Vine)
+### 1. The Vine: Endpoint Discovery and Enumeration
 
-- Automated port scanning
-- Automated GraphQL endpoint discovery
-- Common endpoint path enumeration
+- Automated port scanning with direct connection capabilities
+- Concurrent directory busting for GraphQL endpoints
+- Configurable endpoint path enumeration
+- Built-in common GraphQL endpoint path detection
+- Proxy support for HTTP operations through Burp Suite
+- Introspection query testing to identify vulnerable endpoints
+- Custom endpoint list configuration
 
-### 2. Schema Analysis (The Root)
+### 2. Root Analysis: GraphQL Engine Detection (root.py)
 
-- Introspection query testing
-- Schema validation and analysis
-- Deprecated field detection
-- Type consistency checking
-- Permission boundary testing
-- Schema drift detection
+- Comprehensive GraphQL server implementation fingerprinting
+- Support for detecting 25+ GraphQL engines including:
+  - Apollo Server
+  - GraphQL Yoga
+  - AWS AppSync
+  - Hasura
+  - GraphQL PHP
+  - Ruby GraphQL
+  - And many more
+- Detailed error message analysis
+- Custom query generation for engine identification
+- Proxy-aware implementation testing
 
-### 3. Authentication Testing (The Guard)
+### 3. Crush: DoS Vulnerability Testing
 
-- Authentication bypass detection
-- Token validation and testing
-- Session management analysis
-- Role-based access control (RBAC) testing
-- OAuth 2.0 and JWT validation
+- Schema-aware query generation for targeted testing
+- Circular query vulnerability detection
+- Field duplication attack testing
+- Array batching vulnerability assessment
+- Response time analysis for DoS detection
+- Detailed vulnerability reporting
+- Proxy support for request routing
+- Introspection-based query customization
+- Configurable test parameters
 
-### 4. Query Testing (The Juice)
-
-- Nested query vulnerability detection
-- Circular fragment testing
-- Field duplication attacks
-- Resource exhaustion tests
-- Query complexity analysis
-- Batch query testing
-- Operation name validation
-
-### 5. Mutation Testing (The Seeds)
-
-- Input validation testing
-- File upload vulnerability testing
-- SQL injection via mutations
-- Cross-site scripting (XSS) detection
-- Remote code execution attempts
-- Mass assignment vulnerability testing
-
-### 6. DoS Protection Testing (The Crush)
-
-- Rate limiting validation
-- Query depth analysis
-- Cost analysis
-- Timeout handling
-- Resource allocation testing
-- Batch operation stress testing
+Each module is designed to work independently or as part of the complete suite, with built-in proxy support for integration with security testing tools like Burp Suite. The tools use asynchronous operations for efficient testing and provide detailed output through a custom printing system.
 
 ## Why GrapeQL?
 
