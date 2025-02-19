@@ -341,7 +341,6 @@ class crush():
             self.message.printMsg("No endpoint set or schema not retrieved. Run setEndpoint first.", status="failed")
             return
         
-        print()
         self.message.printMsg(f"Testing endpoint {self.endpoint} for DOS attacks", status="success")
         self.message.printMsg(f"These tests may crach the application. Please proxy in Burp for further analysis.", status="warning")
 

@@ -53,7 +53,6 @@ class root():
         }
         """
         
-        print()
         try:
             async with session.post(
                 self.endpoint,
@@ -148,7 +147,7 @@ class root():
                 ]
                 for test_func, engine_name in tests:
                     if await test_func(session):
-                        self.message.printMsg(f"Detected {engine_name} implementation", status="success")
+                        self.message.printMsg(f"Detected {engine_name} implementation", status="log")
                         return engine_name
                         
             self.message.printMsg("Could not identify GraphQL implementation", status="warning")

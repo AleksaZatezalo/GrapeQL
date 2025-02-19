@@ -215,7 +215,7 @@ class vine():
         Returns:
             List[str]: List of URLs constructed from open ports
         """
-        print()
+        
         self.message.printMsg("Beginning Direct Port Scan", status="success")
         time.sleep(3)
         ports = await self.scanIP(host=ip)
@@ -231,8 +231,8 @@ class vine():
         Returns:
             List[str]: List of all valid URLs found
         """
-        print()
-        self.message.printMsg("Beginning Proxied Directory Busting through Burp", status="success")
+        
+        self.message.printMsg("Started Directory Busting", status="success")
         time.sleep(3)
         url_list = []
         for endpoint in valid_endpoints:
@@ -295,7 +295,7 @@ class vine():
         Returns:
             List[str]: List of vulnerable endpoints with introspection enabled
         """
-        print()
+
         self.message.printMsg("Testing for introspection query", status="success")
         time.sleep(3)
         

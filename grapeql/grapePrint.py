@@ -79,7 +79,7 @@ class grapePrint():
                    - "log" (cyan with [!], default)
         """
         
-        plus = "[+] "
+        plus = "\n[+] "
         exclaim ="[!] "
         fail = "[-] "
 
@@ -106,15 +106,15 @@ class grapePrint():
         """
         
         time.sleep(0.25)
-        print(self.BOLD + "EXAMPLE NOTIFICATIONS: " + self.END)
+        print(self.BOLD + "EXAMPLE NOTIFICATIONS:" + self.END)
+        time.sleep(0.5)
+        self.printMsg("Good news is printed like this.", status="success")
         time.sleep(0.5)
         self.printMsg("Warnings are printed like this.", status="warning")
         time.sleep(0.5)
         self.printMsg("Errors are printed like this.", status="failed")
         time.sleep(0.5)
-        self.printMsg("Good news is printed like this.", status="success")
-        time.sleep(0.5)
-        self.printMsg("Logs are printed like this.\n", status="log")
+        self.printMsg("Logs are printed like this.", status="log")
         time.sleep(0.5)
 
     def intro(self):
