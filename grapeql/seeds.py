@@ -130,15 +130,15 @@ class seeds:
             return False
 
     async def setEndpoint(
-        self, endpoint: str, proxy_string: Optional[str] = None
+        self, endpoint: str, proxy: Optional[str] = None
     ) -> bool:
         """Set the endpoint and configure proxy if provided."""
 
         self.endpoint = endpoint
 
-        if proxy_string:
+        if proxy:
             try:
-                proxy_host, proxy_port = proxy_string.split(":")
+                proxy_host, proxy_port = proxy.split(":")
                 self.configureProxy(proxy_host, int(proxy_port))
             except ValueError:
                 self.message.printMsg(

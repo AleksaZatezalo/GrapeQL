@@ -11,8 +11,9 @@ import time
 from vine import vine
 from root import root
 from crush import crush
-from grapePrint import grapePrint
 from seeds import seeds
+from juice import juice
+from grapePrint import grapePrint
 
 
 def loadWordlist(wordlist_path):
@@ -157,11 +158,9 @@ async def main():
     try:
         scanner = vine()
         seed = seeds()
+        juicey = juice()
         message = grapePrint()
-
-        # Print intro banner
-        message.intro()
-
+    
         # Direct API endpoint testing
         if args.api:
             introspection = await testSingleEndpoint(
@@ -189,8 +188,11 @@ async def main():
             )
 
             time.sleep(2)
-            await seed.setEndpoint(introspection[0])
+            await seed.setEndpoint(introspection[0], proxy=args.proxy if args.proxy else None)
             await seed.runAllChecks()
+
+            await juicey.setEndpoint(introspection[0], proxy=args.proxy if args.proxy else None)    
+            await juicey.scanForInjection()    
 
             if args.crush:
                 await runDosTests(
