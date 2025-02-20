@@ -129,9 +129,7 @@ class seeds:
             self.message.printMsg(f"Connection error: {str(e)}", status="failed")
             return False
 
-    async def setEndpoint(
-        self, endpoint: str, proxy: Optional[str] = None
-    ) -> bool:
+    async def setEndpoint(self, endpoint: str, proxy: Optional[str] = None) -> bool:
         """Set the endpoint and configure proxy if provided."""
 
         self.endpoint = endpoint

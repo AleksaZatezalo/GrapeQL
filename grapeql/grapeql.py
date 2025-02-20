@@ -154,17 +154,17 @@ async def main():
     )
 
     parser.add_argument(
-    "-u", 
-    "--username",
-    help="Username to use for testing (default: admin)",
-    default="admin"
+        "-u",
+        "--username",
+        help="Username to use for testing (default: admin)",
+        default="admin",
     )
 
     parser.add_argument(
-        "-pw", 
+        "-pw",
         "--password",
         help="Password to use for testing (default: changeme)",
-        default="changeme"
+        default="changeme",
     )
 
     args = parser.parse_args()
@@ -178,7 +178,7 @@ async def main():
         message.intro()
 
         juicey.setCredentials(args.username, args.password)
-    
+
         # Direct API endpoint testing
         if args.api:
             introspection = await testSingleEndpoint(
@@ -206,11 +206,15 @@ async def main():
             )
 
             time.sleep(2)
-            await seed.setEndpoint(introspection[0], proxy=args.proxy if args.proxy else None)
+            await seed.setEndpoint(
+                introspection[0], proxy=args.proxy if args.proxy else None
+            )
             await seed.runAllChecks()
 
-            await juicey.setEndpoint(introspection[0], proxy=args.proxy if args.proxy else None)    
-            await juicey.scanForInjection()    
+            await juicey.setEndpoint(
+                introspection[0], proxy=args.proxy if args.proxy else None
+            )
+            await juicey.scanForInjection()
 
             if args.crush:
                 await runDosTests(
