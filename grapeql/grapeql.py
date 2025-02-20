@@ -83,7 +83,7 @@ async def testSingleEndpoint(scanner, api_url, proxy, message):
         # Configure proxy if provided
         if proxy:
             proxy_host, proxy_port = proxy.split(":")
-            scanner.configure_proxy(proxy_host, int(proxy_port))
+            scanner.configureProxy(proxy_host, int(proxy_port))
 
         # Test single endpoint
         vulnerable = await scanner.introspection([api_url])
@@ -174,6 +174,8 @@ async def main():
         seed = seeds()
         juicey = juice()
         message = grapePrint()
+
+        message.intro()
 
         juicey.setCredentials(args.username, args.password)
     
