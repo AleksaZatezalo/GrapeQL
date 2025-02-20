@@ -116,6 +116,12 @@ class juice:
 
         async with aiohttp.ClientSession() as session:
             return await self.runIntrospection(session)
+    
+    def setCredentials(self, username: str, password: str):
+        """Set credentials for authentication testing."""
+        self.username = username
+        self.password = password
+        self.message.printMsg(f"Set credentials to {username}:{password}", status="success")
 
     
     def generateCommandInjectionPayloads(self) -> List[str]:
@@ -174,30 +180,50 @@ class juice:
         # Build arguments string including all required fields
         arg_strings = []
         for arg in field_info["args"]:
-            # If this is our target argument for injection
             if arg["name"] == arg_name:
                 arg_strings.append(f'{arg["name"]}: "{payload}"')
-            # For all other required arguments
             if arg["name"] != arg_name:
-                # Add appropriate default value based on type
                 if arg["name"] == "username":
-                    arg_strings.append(f'{arg["name"]}: "admin"')
+                    arg_strings.append(f'{arg["name"]}: "{self.username}"')
                 elif arg["name"] == "password":
-                    arg_strings.append(f'{arg["name"]}: "changeme"')
+                    arg_strings.append(f'{arg["name"]}: "{self.password}"')
                 elif arg["type"]["name"] == "Int":
                     arg_strings.append(f'{arg["name"]}: 1')
                 elif arg["type"]["name"] == "Boolean":
                     arg_strings.append(f'{arg["name"]}: true')
-                else:  # String, ID, or other types
+                else:
                     arg_strings.append(f'{arg["name"]}: "test"')
         args_str = ", ".join(arg_strings)
 
-        # Since systemDiagnostics returns a String, we don't use a selection set
-        query = f"""
-        {operation_type} {{
-            {field_name}({args_str})
-        }}
-        """
+        # Define common field selections for different types
+        field_selections = {
+            "CreatePaste": "{ id content title success error }",
+            "DeletePaste": "{ success error }",
+            "UpdatePaste": "{ id content success error }",
+            "AuthResponse": "{ token error }",
+            "UserResponse": "{ id username error }",
+            "SystemResponse": "{ status message error }",
+            "Default": "{ id message error success }"
+        }
+
+        # Build the query based on the field type
+        if field_name in ["systemDiagnostics", "getVersion", "getStatus"]:  # Known scalar returns
+            query = f"""
+            {operation_type} {{
+                {field_name}({args_str})
+            }}
+            """
+        else:  # Object types that need selections
+            # Get the appropriate selection or use default
+            selection = field_selections.get(field_name.replace("create", "Create")
+                                                    .replace("delete", "Delete")
+                                                    .replace("update", "Update"), 
+                                        field_selections["Default"])
+            query = f"""
+            {operation_type} {{
+                {field_name}({args_str}) {selection}
+            }}
+            """
 
         start_time = time.time()
         try:
@@ -216,6 +242,7 @@ class juice:
                 # Debug info - only print if there's an error
                 if "errors" in response_data:
                     error_msg = response_data.get("errors", [{}])[0].get("message", "Unknown error")
+                    self.message.printMsg(f"Query: {query}", status="error")
                     self.message.printMsg(f"Query error: {error_msg}", status="error")
 
                 # Check for command output indicators
@@ -241,7 +268,7 @@ class juice:
         except Exception as e:
             self.message.printMsg(f"Error testing {field_name}.{arg_name}: {str(e)}", status="error")
             return False, None, 0.0
-        
+                
     async def scanForInjection(self):
         """Scan all fields for command injection vulnerabilities."""
         if not self.endpoint or not (self.query_fields or self.mutation_fields):

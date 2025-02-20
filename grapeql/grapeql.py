@@ -153,6 +153,20 @@ async def main():
         help="Path to custom wordlist file containing GrapQL API endpoints",
     )
 
+    parser.add_argument(
+    "-u", 
+    "--username",
+    help="Username to use for testing (default: admin)",
+    default="admin"
+    )
+
+    parser.add_argument(
+        "-pw", 
+        "--password",
+        help="Password to use for testing (default: changeme)",
+        default="changeme"
+    )
+
     args = parser.parse_args()
 
     try:
@@ -160,6 +174,8 @@ async def main():
         seed = seeds()
         juicey = juice()
         message = grapePrint()
+
+        juicey.setCredentials(args.username, args.password)
     
         # Direct API endpoint testing
         if args.api:
