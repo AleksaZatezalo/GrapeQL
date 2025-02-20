@@ -58,7 +58,12 @@ Let me analyze the code and rewrite the Features section to accurately reflect t
 - Verification commands (curl)
 - Vulnerability descriptions
 
-### 4. Crush: DoS Vulnerability Testing
+### 4. Juice: Command Injection Testing
+
+- Schema-aware query generation for targeted testing
+- Authenticated command injection testing
+
+### 5. Crush: DoS Vulnerability Testing
 
 - Schema-aware query generation for targeted testing
 - Circular query vulnerability detection
