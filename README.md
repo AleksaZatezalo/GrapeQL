@@ -4,6 +4,7 @@ Version: 1.0
 Last Updated: January 2025
 
 ## Overview
+
 GrapeQL is a comprehensive GraphQL security assessment toolkit designed to help security researchers and developers identify vulnerabilities in GraphQL implementations. Named after the fruit that grows in clusters, GrapeQL tests multiple security aspects of your GraphQL endpoint in parallel, providing thorough coverage of potential security issues.
 
 ```ascii
@@ -17,7 +18,86 @@ GrapeQL is a comprehensive GraphQL security assessment toolkit designed to help 
 
 Let me analyze the code and rewrite the Features section to accurately reflect the implemented classes.
 
+## GrapeQL Usage Guide
 
+GrapeQL is a GraphQL security testing tool that can identify and test for various denial of service (DoS) vulnerabilities in GraphQL endpoints.
+
+### Basic Usage
+
+```bash
+python3 main.py [-h] (-t TARGET | --api API) [-p PROXY] [-c] [-w WORDLIST]
+```
+
+#### Required Arguments
+
+- `-t TARGET, --target TARGET`
+  - Target IP address to scan
+  - Example: `python3 graphql.py -t 192.168.1.100`
+
+- `--api API`
+  - Direct URL to test for GraphQL introspection
+  - Bypasses port scanning and directory busting
+  - Example: `python3 graphql.py --api http://example.com/graphql`
+
+### Optional Arguments
+
+- `-p PROXY, --proxy PROXY`
+  - Optional proxy address in format host:port
+  - Useful for intercepting traffic with tools like Burp Suite
+  - Example: `python3 graphql.py -t 192.168.1.100 -p 127.0.0.1:8080`
+
+- `-c, --crush`
+  - Use enhanced crush DoS testing instead of standard root testing
+  - Includes additional test vectors like directory overloading
+  - Example: `python3 graphql.py --api http://example.com/graphql -c`
+
+- `-w WORDLIST, --wordlist WORDLIST`
+  - Path to custom wordlist file for endpoint discovery
+  - Example: `python3 graphql.py -t 192.168.1.100 -w custom_paths.txt`
+
+- `-u USERNAME`
+  - Name passed to the variable username in GraphQL queries
+
+- `-pw PASSWORD`
+  - Password passed to the variable password in GraphQL queries
+
+
+## Example Usage Scenarios
+
+1.Basic scan of an IP address:
+
+```bash
+python3 main.py -t 192.168.1.100
+```
+
+2.Direct testing of a known GraphQL endpoint with enhanced DoS testing:
+
+```bash
+python3 main.py --api http://example.com/graphql --crush
+```
+
+3.Testing through Burp Suite proxy with custom wordlist:
+
+```bash
+python3 main.py -t 192.168.1.100 -p 127.0.0.1:8080 -w wordlist.txt
+```
+
+4.Full scan with all options:
+
+```bash
+python3 main.py -t 192.168.1.100 -p 127.0.0.1:8080 -w wordlist.txt -crush -u admin -pw changeme
+```
+
+## Notes
+
+- When using the proxy option, ensure your proxy tool (e.g., Burp Suite) is properly configured
+- The crush testing mode (-c) includes more aggressive tests that might impact application performance
+- Custom wordlists should contain one path per line
+- All HTTPS connections through proxy are made with SSL verification disabled
+
+## Warning
+
+This tool is intended for security testing with proper authorization. Unauthorized testing against systems you don't own or have permission to test may be illegal.
 
 ## Features
 
