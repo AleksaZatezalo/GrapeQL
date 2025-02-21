@@ -21,9 +21,9 @@ class grapePrint:
         Initialize the grapePrint class with ANSI color and style codes.
 
         Sets up color codes for:
-        - Standard colors (purple, cyan, blue, green, yellow, red)
-        - Text styles (bold, underline)
-        - Reset code (END)
+        - Standard color
+        - Text styles
+        - Reset code
         """
 
         self.PURPLE = "\033[95m"

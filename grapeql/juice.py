@@ -20,6 +20,7 @@ class juice:
 
     def __init__(self):
         """Initialize the injection tester with default settings."""
+        
         self.message = grapePrint()
         self.proxy_url: Optional[str] = None
         self.endpoint: Optional[str] = None
@@ -30,6 +31,7 @@ class juice:
 
     def configureProxy(self, proxy_host: str, proxy_port: int):
         """Configure HTTP proxy settings."""
+
         self.proxy_url = f"http://{proxy_host}:{proxy_port}"
 
     async def runIntrospection(self, session: aiohttp.ClientSession) -> bool:
@@ -108,6 +110,7 @@ class juice:
 
     async def setEndpoint(self, endpoint: str, proxy: Optional[str] = None) -> bool:
         """Set the endpoint and retrieve its schema through introspection."""
+
         self.endpoint = endpoint
 
         if proxy:
@@ -125,6 +128,7 @@ class juice:
 
     def setCredentials(self, username: str, password: str):
         """Set credentials for authentication testing."""
+        
         self.username = username
         self.password = password
         self.message.printMsg(
@@ -133,6 +137,7 @@ class juice:
 
     def generateCommandInjectionPayloads(self) -> List[str]:
         """Generate command injection test payloads."""
+
         return [
             # Basic Command Execution
             ";id",
@@ -178,6 +183,7 @@ class juice:
         is_mutation: bool = False,
     ) -> Tuple[bool, Optional[str], float]:
         """Test a specific field for command injection vulnerabilities."""
+
         operation_type = "mutation" if is_mutation else "query"
 
         # Get field info from schema
@@ -297,6 +303,7 @@ class juice:
 
     async def scanForInjection(self):
         """Scan all fields for command injection vulnerabilities."""
+
         if not self.endpoint or not (self.query_fields or self.mutation_fields):
             self.message.printMsg(
                 "No endpoint set or schema not retrieved. Run setEndpoint first.",
