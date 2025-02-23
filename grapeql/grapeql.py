@@ -172,13 +172,11 @@ async def main():
         scanner = vine()
         seed = seeds()
         juicey = juice()
-        washer = wash()
         message = grapePrint()
 
         message.intro()
 
         juicey.setCredentials(args.username, args.password)
-        washer.setCredentials(args.username, args.password)
 
         # Direct API endpoint testing
         if args.api:
