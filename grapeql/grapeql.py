@@ -15,6 +15,7 @@ from seeds import seeds
 from juice import juice
 from grapePrint import grapePrint
 
+
 def loadWordlist(wordlist_path):
     """
     Load endpoints from a wordlist file.

@@ -10,6 +10,7 @@ import asyncio
 from typing import Dict, List, Optional
 from grapePrint import grapePrint
 
+
 class seeds:
     """
     A class for testing GraphQL endpoints for various security vulnerabilities.

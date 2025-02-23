@@ -19,7 +19,7 @@ class juice:
 
     def __init__(self):
         """Initialize the injection tester with default settings."""
-        
+
         self.message = grapePrint()
         self.proxy_url: Optional[str] = None
         self.endpoint: Optional[str] = None
@@ -127,11 +127,12 @@ class juice:
 
     def setCredentials(self, username: str, password: str):
         """Set credentials for command injection testing."""
-        
+
         self.username = username
         self.password = password
         self.message.printMsg(
-            f"Set credentials to {username}:{password} for command injection testing", status="success"
+            f"Set credentials to {username}:{password} for command injection testing",
+            status="success",
         )
 
     def generateCommandInjectionPayloads(self) -> List[str]:
