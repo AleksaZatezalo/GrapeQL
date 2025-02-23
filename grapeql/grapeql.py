@@ -14,7 +14,6 @@ from crush import crush
 from seeds import seeds
 from juice import juice
 from grapePrint import grapePrint
-from wash import wash
 
 def loadWordlist(wordlist_path):
     """
