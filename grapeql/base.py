@@ -11,6 +11,7 @@ Description: Base class used to execute test cases.
 # Easily extendible
 # Open tickets to SQLi Implementation
 # Open tickets open source
+# Create good docs
 
 class base:
 
