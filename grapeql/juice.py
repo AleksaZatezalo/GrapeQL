@@ -126,12 +126,12 @@ class juice:
             return await self.runIntrospection(session)
 
     def setCredentials(self, username: str, password: str):
-        """Set credentials for authentication testing."""
+        """Set credentials for command injection testing."""
         
         self.username = username
         self.password = password
         self.message.printMsg(
-            f"Set credentials to {username}:{password}", status="success"
+            f"Set credentials to {username}:{password} for command injection testing", status="success"
         )
 
     def generateCommandInjectionPayloads(self) -> List[str]:

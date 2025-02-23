@@ -14,7 +14,7 @@ from crush import crush
 from seeds import seeds
 from juice import juice
 from grapePrint import grapePrint
-
+from wash import wash
 
 def loadWordlist(wordlist_path):
     """
@@ -178,7 +178,7 @@ async def main():
         message.intro()
 
         juicey.setCredentials(args.username, args.password)
-
+        
         # Direct API endpoint testing
         if args.api:
             introspection = await testSingleEndpoint(
@@ -214,6 +214,7 @@ async def main():
             await juicey.setEndpoint(
                 introspection[0], proxy=args.proxy if args.proxy else None
             )
+
             await juicey.scanForInjection()
 
             if args.crush:
