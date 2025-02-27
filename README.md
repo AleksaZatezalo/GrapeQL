@@ -1,7 +1,11 @@
 # 🍇 GrapeQL: The GraphQL Security Testing Suite
 
 Version: 1.0
-Last Updated: January 2025
+Last Updated: Februrary 2025
+
+1. Refactor (Base Class)
+2. Windows Coloring (OS Print)
+3. Auth Token
 
 ## Overview
 
