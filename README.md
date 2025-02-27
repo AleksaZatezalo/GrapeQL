@@ -5,8 +5,10 @@ Last Updated: Februrary 2025
 
 1. Refactor (Base Class)
 2. Windows Coloring (OS Print)
-3. Auth Token
-4. Reach Out To Ashish (Add Him To Repo)
+3. Auth Token (Basic Bearer Token)
+4. False Positives (Like CSRF)
+5. Other Misconfigurations
+6. Reach Out To Ashish (Add Him To Repo)
 
 ## Overview
 
