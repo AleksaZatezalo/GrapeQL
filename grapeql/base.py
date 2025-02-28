@@ -11,9 +11,14 @@ from grapePrint import grapePrint
 import json
 import time
 
+# To Do
+# Use crush, juice, ... etc as payload generation
+# Set token as potential thing
+# Call out true negatives (note down Ismaeels thing)
 
 class base:
     """
+    A class made to manage and launch grapgql test suite.
     """
 
     def __init__(self):
@@ -132,4 +137,23 @@ class base:
         self.message.printMsg(
             f"Set credentials to {username}:{password} for command injection testing",
             status="success",
-          }
+        )s
+
+    def genPayloads():
+        """
+        """
+        
+        pass
+
+    def formatRequest():
+        """
+        """
+
+        pass
+
+    def executeTests():
+        """
+        ""
+
+        pass
+        
