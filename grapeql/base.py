@@ -15,6 +15,7 @@ import time
 # Use crush, juice, ... etc as payload generation
 # Set token as potential thing
 # Call out true negatives (note down Ismaeels thing)
+# Print Nicley on Windows
 
 class base:
     """
@@ -153,7 +154,11 @@ class base:
 
     def executeTests():
         """
-        ""
+        """
 
         pass
-        
+
+    def writeToFile():
+        """
+        ""
+        pass
