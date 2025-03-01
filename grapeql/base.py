@@ -16,6 +16,8 @@ import time
 # Set token as potential thing
 # Call out true negatives (note down Ismaeels thing)
 # Print Nicley on Windows
+# Make this into package (Docs, examples, tests)
+# Report test I tried it on
 
 class base:
     """
