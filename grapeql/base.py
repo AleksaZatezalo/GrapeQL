@@ -30,6 +30,7 @@ class base:
         self.message = grapePrint()
         self.proxy_url: Optional[str] = None
         self.endpoint: Optional[str] = None
+        self.authToken: Optional[str] = None
         self.headers = {"Content-Type": "application/json"}
         self.schema: Optional[Dict] = None
         self.mutation_fields: Dict[str, Dict] = {}
