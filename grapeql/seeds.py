@@ -8,7 +8,7 @@ Description: GraphQL security testing module for informational issues.
 import aiohttp
 import asyncio
 from typing import Dict, List, Optional
-from grapePrint import grapePrint
+from .grapePrint import grapePrint
 
 
 class seeds:

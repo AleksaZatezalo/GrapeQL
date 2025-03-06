@@ -7,7 +7,7 @@ Description: GraphQL fingerprinting module with schema-aware query generation
 
 import aiohttp
 from typing import Dict, List, Optional
-from grapePrint import grapePrint
+from .grapePrint import grapePrint
 
 
 class EngineInfo:

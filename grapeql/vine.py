@@ -9,7 +9,7 @@ Port scanning is performed directly while directory busting and introspection ar
 import asyncio
 import aiohttp
 from typing import List, Optional
-from grapePrint import grapePrint
+from .grapePrint import grapePrint
 import time
 import socket
 

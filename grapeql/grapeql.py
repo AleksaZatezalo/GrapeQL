@@ -8,12 +8,12 @@ Description: Main file for GrapeQL with command-line argument support and enhanc
 import asyncio
 import argparse
 import time
-from vine import vine
-from root import root
-from crush import crush
-from seeds import seeds
-from juice import juice
-from grapePrint import grapePrint
+from .vine import vine
+from .root import root
+from .crush import crush
+from .seeds import seeds
+from .juice import juice
+from .grapePrint import grapePrint
 
 
 def loadWordlist(wordlist_path):
@@ -119,7 +119,7 @@ async def runDosTests(endpoint: str, proxy: str = None, use_crush: bool = False)
         message.printMsg("Failed to set endpoint or retrieve schema", status="failed")
 
 
-async def main():
+async def _main():
     """
     Main function to handle command-line arguments and perform graphql scanning.
     """
@@ -231,6 +231,6 @@ async def main():
     return 0
 
 
-if __name__ == "__main__":
-    exit_code = asyncio.run(main())
+def run_cli():
+    exit_code = asyncio.run(_main())
     exit(exit_code)
