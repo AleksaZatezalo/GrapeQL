@@ -7,7 +7,7 @@ Description: Module to test for command injection, sql injections, and other inj
 
 import aiohttp
 from typing import Dict, List, Optional, Tuple
-from grapePrint import grapePrint
+from .grapePrint import grapePrint
 import json
 import time
 
