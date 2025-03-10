@@ -7,11 +7,12 @@ Description: GraphQL security testing module for informational issues.
 
 import aiohttp
 import asyncio
+from .base import base
 from typing import Dict, List, Optional
 from .grapePrint import grapePrint
 
 
-class seeds:
+class seeds(base):
     """
     A class for testing GraphQL endpoints for various security vulnerabilities.
     Generates targeted queries based on introspection of the actual schema.
@@ -19,7 +20,7 @@ class seeds:
 
     def __init__(self):
         """Initialize the security tester with default settings and printer."""
-
+        super().__init__()
         self.message = grapePrint()
         self.proxy_url: Optional[str] = None
         self.endpoint: Optional[str] = None

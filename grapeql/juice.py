@@ -8,18 +8,19 @@ Description: Module to test for command injection, sql injections, and other inj
 import aiohttp
 from typing import Dict, List, Optional, Tuple
 from .grapePrint import grapePrint
+from .base import base
 import json
 import time
 
 
-class juice:
+class juice(base):
     """
     A class for testing GraphQL endpoints for injection vulnerabilities.
     """
 
     def __init__(self):
         """Initialize the injection tester with default settings."""
-
+        super().__init__()  # Initialize the base class
         self.message = grapePrint()
         self.proxy_url: Optional[str] = None
         self.endpoint: Optional[str] = None
