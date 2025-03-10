@@ -8,8 +8,9 @@ Port scanning is performed directly while directory busting and introspection ar
 
 import asyncio
 import aiohttp
-from typing import List, Optional
+from typing import Dict, List, Optional
 from .grapePrint import grapePrint
+from .headers_manager import HeadersManager
 import time
 import socket
 
@@ -18,6 +19,7 @@ class vine:
     """
     A class for scanning and identifying GraphQL endpoints with introspection enabled.
     Supports proxying HTTP traffic through Burpsuite while performing direct port scans.
+    Now with custom headers and cookies support.
     """
 
     def __init__(self):
@@ -41,6 +43,7 @@ class vine:
             "/user/graphql",
         ]
         self.proxy_url: Optional[str] = None
+        self.headers_manager = HeadersManager()
 
     def configureProxy(self, proxy_host: str, proxy_port: int):
         """
@@ -52,6 +55,59 @@ class vine:
         """
 
         self.proxy_url = f"http://{proxy_host}:{proxy_port}"
+
+    def set_header(self, name: str, value: str):
+        """
+        Set a custom header.
+        
+        Args:
+            name: Header name
+            value: Header value
+        """
+        self.headers_manager.add_header(name, value)
+        self.message.printMsg(f"Set header {name}: {value}", status="success")
+
+    def set_headers(self, headers: Dict[str, str]):
+        """
+        Set multiple custom headers.
+        
+        Args:
+            headers: Dictionary of header name/value pairs
+        """
+        self.headers_manager.add_headers(headers)
+        # self.message.printMsg(f"Set {len(headers)} custom headers", status="success")
+
+    def set_cookie(self, name: str, value: str):
+        """
+        Set a cookie.
+        
+        Args:
+            name: Cookie name
+            value: Cookie value
+        """
+        self.headers_manager.add_cookie(name, value)
+        self.message.printMsg(f"Set cookie {name}: {value}", status="success")
+
+    def set_cookies(self, cookies: Dict[str, str]):
+        """
+        Set multiple cookies.
+        
+        Args:
+            cookies: Dictionary of cookie name/value pairs
+        """
+        self.headers_manager.add_cookies(cookies)
+        # self.message.printMsg(f"Set {len(cookies)} cookies", status="success")
+
+    def set_authorization(self, token: str, prefix: str = "Bearer"):
+        """
+        Set Authorization header.
+        
+        Args:
+            token: Authorization token
+            prefix: Token type prefix (default: "Bearer")
+        """
+        self.headers_manager.set_authorization(token, prefix)
+        self.message.printMsg(f"Set authorization token with prefix '{prefix}'", status="success")
 
     def setApiList(self, endpoints: List[str]) -> bool:
         """
@@ -211,6 +267,8 @@ class vine:
                 timeout=aiohttp.ClientTimeout(total=5),
                 proxy=self.proxy_url,
                 ssl=False,  # Required for Burp to intercept HTTPS
+                headers=self.headers_manager.get_all_headers(),
+                cookies=self.headers_manager.get_all_cookies(),
             ) as response:
                 if response.status != 404:
                     # Check if response contains WebSocket text
@@ -304,7 +362,8 @@ class vine:
             async with session.post(
                 endpoint,
                 json={"query": query},
-                headers={"Content-Type": "application/json"},
+                headers=self.headers_manager.get_all_headers(),
+                cookies=self.headers_manager.get_all_cookies(),
                 timeout=aiohttp.ClientTimeout(total=5),
                 proxy=self.proxy_url,
                 ssl=False,  # Required for Burp to intercept HTTPS

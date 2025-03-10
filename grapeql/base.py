@@ -8,6 +8,7 @@ Description: Module for session managment and request generation.
 import aiohttp
 from typing import Dict, List, Optional, Tuple
 from .grapePrint import grapePrint
+from .headers_manager import HeadersManager
 import json
 import time
 
@@ -21,7 +22,7 @@ import time
 
 class base:
     """
-    A class made to manage and launch grapgql test suite.
+    A class made to manage and launch GraphQL test suite with support for custom headers and cookies.
     """
 
     def __init__(self):
@@ -31,7 +32,7 @@ class base:
         self.proxy_url: Optional[str] = None
         self.endpoint: Optional[str] = None
         self.authToken: Optional[str] = None
-        self.headers = {"Content-Type": "application/json"}
+        self.headers_manager = HeadersManager()
         self.schema: Optional[Dict] = None
         self.mutation_fields: Dict[str, Dict] = {}
         self.query_fields: Dict[str, Dict] = {}
@@ -40,6 +41,70 @@ class base:
         """Configure HTTP proxy settings."""
 
         self.proxy_url = f"http://{proxy_host}:{proxy_port}"
+
+    def set_header(self, name: str, value: str):
+        """
+        Set a custom header.
+        
+        Args:
+            name: Header name
+            value: Header value
+        """
+        self.headers_manager.add_header(name, value)
+        self.message.printMsg(f"Set header {name}: {value}", status="success")
+
+    def set_headers(self, headers: Dict[str, str]):
+        """
+        Set multiple custom headers.
+        
+        Args:
+            headers: Dictionary of header name/value pairs
+        """
+        self.headers_manager.add_headers(headers)
+        # self.message.printMsg(f"Set {len(headers)} custom headers", status="success")
+
+    def set_cookie(self, name: str, value: str):
+        """
+        Set a cookie.
+        
+        Args:
+            name: Cookie name
+            value: Cookie value
+        """
+        self.headers_manager.add_cookie(name, value)
+        self.message.printMsg(f"Set cookie {name}: {value}", status="success")
+
+    def set_cookies(self, cookies: Dict[str, str]):
+        """
+        Set multiple cookies.
+        
+        Args:
+            cookies: Dictionary of cookie name/value pairs
+        """
+        self.headers_manager.add_cookies(cookies)
+        # self.message.printMsg(f"Set {len(cookies)} cookies", status="success")
+
+    def set_authorization(self, token: str, prefix: str = "Bearer"):
+        """
+        Set Authorization header.
+        
+        Args:
+            token: Authorization token
+            prefix: Token type prefix (default: "Bearer")
+        """
+        self.headers_manager.set_authorization(token, prefix)
+        self.authToken = token
+        self.message.printMsg(f"Set authorization token with prefix '{prefix}'", status="success")
+
+    def clear_headers(self):
+        """Reset headers to default state."""
+        self.headers_manager.clear_headers()
+        self.message.printMsg("Cleared all custom headers", status="success")
+
+    def clear_cookies(self):
+        """Remove all cookies."""
+        self.headers_manager.clear_cookies()
+        self.message.printMsg("Cleared all cookies", status="success")
 
     async def runIntrospection(self, session: aiohttp.ClientSession) -> bool:
         """Run introspection query to validate the GraphQL endpoint."""
@@ -80,7 +145,8 @@ class base:
             async with session.post(
                 self.endpoint,
                 json={"query": query},
-                headers=self.headers,
+                headers=self.headers_manager.get_all_headers(),
+                cookies=self.headers_manager.get_all_cookies(),
                 proxy=self.proxy_url,
                 ssl=False,
             ) as response:
@@ -141,7 +207,7 @@ class base:
         self.message.printMsg(
             f"Set credentials to {username}:{password} for command injection testing",
             status="success",
-        )s
+        )
 
     def genPayloads():
         """

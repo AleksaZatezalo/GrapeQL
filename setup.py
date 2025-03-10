@@ -20,8 +20,9 @@ setup(
     ],
     python_requires=">=3.6",
     install_requires=[
-        "aiohttp",
-        "asyncio",
+        "aiohttp>=3.8.5",
+        "asyncio>=3.4.3",
+        "typing>=3.7.4",
         # Add any other dependencies your package has here
     ],
     entry_points={
