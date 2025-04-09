@@ -1,8 +1,8 @@
 """
 Author: Aleksa Zatezalo
-Version: 2.0
+Version: 2.4
 Date: March 2025
-Description: Main file for GrapeQL with command-line argument support and unified architecture
+Description: Fixed main file for GrapeQL with proper session handling
 """
 
 import asyncio
@@ -91,10 +91,14 @@ async def runFingerprinting(endpoint: str, proxy: str = None, headers=None, cook
                     message.printMsg(f"Technology stack: {', '.join(engine_info['technology'])}", status="success")
                 message.printMsg(f"Reference: {engine_info['url']}", status="success")
             
+            # Ensure we close the client session
+            await fingerprinter.close()
             return engine_info
 
     except Exception as e:
         message.printMsg(f"Error during fingerprinting: {str(e)}", status="error")
+        # Ensure we close the client session even if there's an error
+        await fingerprinter.close()
         return {
             "name": "unknown",
             "url": "",
@@ -152,17 +156,21 @@ async def runDosTests(endpoint: str, proxy: str = None, headers=None, cookies=No
     message = grapePrint()
     dos_tester = crush()
 
-    # Set the endpoint and get schema
-    if await dos_tester.set_endpoint(endpoint, proxy):
-        # Set custom headers and cookies if provided
-        if headers:
-            dos_tester.set_headers(headers)
-        if cookies:
-            dos_tester.set_cookies(cookies)
-            
-        await dos_tester.testEndpointDos()
-    else:
-        message.printMsg("Failed to set endpoint or retrieve schema", status="failed")
+    try:
+        # Set the endpoint and get schema
+        if await dos_tester.set_endpoint(endpoint, proxy):
+            # Set custom headers and cookies if provided
+            if headers:
+                dos_tester.set_headers(headers)
+            if cookies:
+                dos_tester.set_cookies(cookies)
+                
+            await dos_tester.testEndpointDos()
+        else:
+            message.printMsg("Failed to set endpoint or retrieve schema", status="failed")
+    finally:
+        # Ensure we close the session
+        await dos_tester.close()
 
 
 async def run_security_checks(endpoint: str, proxy: str = None, headers=None, cookies=None, username=None, password=None):
@@ -197,36 +205,44 @@ async def run_security_checks(endpoint: str, proxy: str = None, headers=None, co
     # Run basic security checks
     message.printMsg("Starting basic security checks...", status="log")
     security_tester = seeds()
-    if await security_tester.set_endpoint(endpoint, proxy):
-        if headers:
-            security_tester.set_headers(headers)
-        if cookies:
-            security_tester.set_cookies(cookies)
+    try:
+        if await security_tester.set_endpoint(endpoint, proxy):
+            if headers:
+                security_tester.set_headers(headers)
+            if cookies:
+                security_tester.set_cookies(cookies)
+                
+            basic_vulnerabilities = await security_tester.runAllChecks()
             
-        basic_vulnerabilities = await security_tester.runAllChecks()
-        
-        if basic_vulnerabilities:
-            message.printMsg(f"Found {len(basic_vulnerabilities)} potential vulnerabilities", status="warning")
-        else:
-            message.printMsg("No basic vulnerabilities found", status="success")
+            if basic_vulnerabilities:
+                message.printMsg(f"Found {len(basic_vulnerabilities)} potential vulnerabilities", status="warning")
+            else:
+                message.printMsg("No basic vulnerabilities found", status="success")
+    finally:
+        # Ensure we close the session
+        await security_tester.close()
     
     # Run command injection tests
     message.printMsg("Starting injection tests...", status="log")
     injection_tester = juice()
-    if await injection_tester.set_endpoint(endpoint, proxy):
-        if headers:
-            injection_tester.set_headers(headers)
-        if cookies:
-            injection_tester.set_cookies(cookies)
-        if username and password:
-            injection_tester.set_credentials(username, password)
+    try:
+        if await injection_tester.set_endpoint(endpoint, proxy):
+            if headers:
+                injection_tester.set_headers(headers)
+            if cookies:
+                injection_tester.set_cookies(cookies)
+            if username and password:
+                injection_tester.set_credentials(username, password)
+                
+            injection_vulnerabilities = await injection_tester.scanForInjection()
             
-        injection_vulnerabilities = await injection_tester.scanForInjection()
-        
-        if injection_vulnerabilities:
-            message.printMsg(f"Found {len(injection_vulnerabilities)} injection vulnerabilities!", status="failed")
-        else:
-            message.printMsg("No injection vulnerabilities found", status="success")
+            if injection_vulnerabilities:
+                message.printMsg(f"Found {len(injection_vulnerabilities)} injection vulnerabilities!", status="failed")
+            else:
+                message.printMsg("No injection vulnerabilities found", status="success")
+    finally:
+        # Ensure we close the session
+        await injection_tester.close()
     
     # Return comprehensive results
     return {
@@ -376,6 +392,7 @@ async def main():
             scanner.set_cookies(cookies)
 
         all_vulnerabilities = []
+        vulnerable_endpoints = []
         
         # Direct API endpoint testing
         if args.api:
@@ -397,6 +414,10 @@ async def main():
             vulnerable_endpoints = await scanner.test(
                 args.proxy if args.proxy else None, args.target
             )
+
+        # Clean up the scanner's client session
+        if hasattr(scanner.client, "close"):
+            await scanner.client.close()
 
         if not vulnerable_endpoints:
             message.printMsg("No vulnerable GraphQL endpoints found", status="log")
@@ -437,11 +458,23 @@ async def main():
             generate_report(args.report, all_vulnerabilities)
             message.printMsg(f"Report generated: {args.report}", status="success")
 
+        return 0
+
     except Exception as e:
         message.printMsg(f"Error during scan: {str(e)}", status="error")
         return 1
-
-    return 0
+    finally:
+        # Make sure to clean up any lingering sessions
+        # This is important for avoiding the "Unclosed client session" warnings
+        if 'scanner' in locals() and hasattr(scanner, 'client') and hasattr(scanner.client, 'close'):
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.create_task(scanner.client.close())
+                else:
+                    loop.run_until_complete(scanner.client.close())
+            except:
+                pass
 
 
 def run_cli():

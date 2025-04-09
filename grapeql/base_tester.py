@@ -1,8 +1,8 @@
 """
 Author: Aleksa Zatezalo
-Version: 1.0
+Version: 1.1
 Date: March 2025
-Description: Base class for GraphQL security testers
+Description: Base class for GraphQL security testers with proper session handling
 """
 
 import asyncio
@@ -11,10 +11,11 @@ from grapePrint import grapePrint
 from http_client import GraphQLClient
 from schema_manager import SchemaManager
 
+
 class BaseTester:
     """
     Base class for GraphQL security testing.
-    Provides common functionality for all testing modules.
+    Provides common functionality for all testing modules with proper resource management.
     """
     
     def __init__(self):
@@ -167,3 +168,10 @@ class BaseTester:
             str: curl command
         """
         return self.client.generate_curl()
+    
+    async def close(self) -> None:
+        """
+        Clean up resources by closing the HTTP client.
+        This should be called at the end of testing.
+        """
+        await self.client.close()

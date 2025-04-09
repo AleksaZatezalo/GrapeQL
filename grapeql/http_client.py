@@ -1,8 +1,8 @@
 """
 Author: Aleksa Zatezalo
-Version: 1.0
+Version: 1.1
 Date: March 2025
-Description: Unified HTTP client for GraphQL requests with request caching
+Description: Unified HTTP client for GraphQL requests with proper session handling
 """
 
 import aiohttp
@@ -12,6 +12,8 @@ from headers_manager import HeadersManager
 import json
 import time
 import functools
+import atexit
+
 
 class GraphQLClient:
     """
@@ -27,6 +29,19 @@ class GraphQLClient:
         self.last_response = None
         self._session: Optional[aiohttp.ClientSession] = None
         self._request_cache = {}
+        self._session_lock = asyncio.Lock()
+        
+        # Register cleanup function to ensure sessions are closed
+        atexit.register(self._cleanup)
+        
+    def _cleanup(self):
+        """Cleanup resources when the program exits."""
+        if self._session and not self._session.closed:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(self.close())
+            else:
+                loop.run_until_complete(self.close())
         
     def set_endpoint(self, endpoint: str) -> None:
         """
@@ -139,15 +154,17 @@ class GraphQLClient:
     
     async def ensure_session(self):
         """Ensure an aiohttp client session exists."""
-        if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession()
-        return self._session
+        async with self._session_lock:
+            if self._session is None or self._session.closed:
+                self._session = aiohttp.ClientSession()
+            return self._session
     
     async def close(self):
         """Close the aiohttp client session."""
-        if self._session and not self._session.closed:
-            await self._session.close()
-            self._session = None
+        async with self._session_lock:
+            if self._session and not self._session.closed:
+                await self._session.close()
+                self._session = None
     
     async def request(
         self, 
@@ -194,6 +211,10 @@ class GraphQLClient:
             if cache_key in self._request_cache:
                 return self._request_cache[cache_key]
         
+        timeout = kwargs.pop('timeout', 30)
+        if isinstance(timeout, (int, float)):
+            timeout = aiohttp.ClientTimeout(total=timeout)
+            
         session = await self.ensure_session()
         
         try:
@@ -204,6 +225,7 @@ class GraphQLClient:
                 cookies=all_cookies,
                 proxy=self.proxy_url,
                 ssl=False,
+                timeout=timeout,
                 **kwargs
             ) as response:
                 # Store the response for reference (e.g., for curl generation)
