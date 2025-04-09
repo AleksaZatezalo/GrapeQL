@@ -1,8 +1,8 @@
 """
 Author: Aleksa Zatezalo
-Version: 2.6
-Date: March 2025
-Description: Optimized vine module that focuses on common ports including 5013
+Version: 2.7
+Date: April 2025
+Description: Optimized vine module with improved test reporting
 """
 
 import asyncio
@@ -66,6 +66,11 @@ class vine:
         self.max_concurrent_scans = 50     # Maximum concurrent directory requests
         self.port_scan_timeout = 0.5       # Port scan connection timeout
         self.dirb_timeout = 5              # Directory busting timeout
+        
+        # Tracking variables
+        self.endpoints_tested = 0
+        self.endpoints_found = 0
+        self.vulnerable_endpoints = 0
         
         # Websocket filter strings
         self.websocket_indicators = [
@@ -263,10 +268,17 @@ class vine:
             self.message.printMsg(f"{host}:{port} [OPEN]")
             
         # Final report
-        self.message.printMsg(
-            f"Common port scan completed. Found {len(open_ports)} open ports.",
-            status="success"
-        )
+        if open_ports:
+            self.message.printMsg(
+                f"Common port scan completed. Found {len(open_ports)} open ports.",
+                status="success"
+            )
+        else:
+            self.message.printTestResult(
+                "Port Scan", 
+                vulnerable=False, 
+                details=f"No open ports found on {host}"
+            )
         
         return sorted(open_ports)
 
@@ -299,6 +311,7 @@ class vine:
             Optional[str]: Full URL if endpoint exists and is not a WebSocket endpoint, None otherwise
         """
         full_url = f"{base_url.rstrip('/')}/{path.lstrip('/')}"
+        self.endpoints_tested += 1
         
         try:
             # Set the URL for this request only, without changing the client's endpoint
@@ -326,8 +339,11 @@ class vine:
             for indicator in graphql_indicators:
                 if indicator.lower() in response_text.lower():
                     self.message.printMsg(f"Potential GraphQL endpoint found: {full_url}", status="success")
+                    self.endpoints_found += 1
                     return full_url
-                
+            
+            # If we get here, the endpoint exists but no GraphQL indicators found
+            self.endpoints_found += 1
             return full_url
                 
         except Exception as e:
@@ -357,7 +373,16 @@ class vine:
         batch_results = await asyncio.gather(*tasks)
         
         # Filter out None values
-        return [url for url in batch_results if url]
+        valid_urls = [url for url in batch_results if url]
+        
+        if not valid_urls:
+            self.message.printTestResult(
+                f"Directory Scan for {base_url}", 
+                vulnerable=False, 
+                details="No GraphQL endpoints found at this URL"
+            )
+            
+        return valid_urls
 
     async def constructAddress(self, ip: str) -> List[str]:
         """
@@ -403,6 +428,8 @@ class vine:
             
         self.message.printMsg(f"Started directory busting against {len(valid_endpoints)} endpoints", status="success")
         
+        self.endpoints_tested = 0
+        self.endpoints_found = 0
         start_time = time.time()
         all_valid_urls = []
         
@@ -411,10 +438,20 @@ class vine:
             all_valid_urls.extend(found_urls)
         
         dirb_time = time.time() - start_time
-        self.message.printMsg(
-            f"Directory busting completed in {dirb_time:.1f} seconds. Found {len(all_valid_urls)} potential endpoints.",
-            status="success"
-        )
+        
+        # Print summary
+        if all_valid_urls:
+            self.message.printMsg(
+                f"Directory busting completed in {dirb_time:.1f} seconds. Found {len(all_valid_urls)} potential endpoints.",
+                status="success"
+            )
+        else:
+            self.message.printTestResult(
+                "Directory Busting", 
+                vulnerable=False, 
+                details=f"No endpoints found after testing {self.endpoints_tested} paths in {dirb_time:.1f} seconds"
+            )
+            
         return all_valid_urls
 
     async def test_introspection(self, endpoint: str) -> bool:
@@ -474,9 +511,16 @@ class vine:
             is_introspectable = await self.test_introspection(endpoint)
             
             if is_introspectable:
+                self.vulnerable_endpoints += 1
                 self.message.printMsg(f"Introspection enabled: {endpoint}", status="warning")
                 return endpoint
-                
+            
+            # Introspection not enabled    
+            self.message.printTestResult(
+                f"Introspection Test: {endpoint}", 
+                vulnerable=False, 
+                details="GraphQL endpoint exists but introspection is disabled"
+            )
             return None
             
         except Exception:
@@ -498,6 +542,9 @@ class vine:
             
         self.message.printMsg(f"Testing {len(endpoints)} endpoints for introspection", status="success")
         
+        self.vulnerable_endpoints = 0
+        start_time = time.time()
+        
         # Use a semaphore to limit concurrent connections
         semaphore = asyncio.Semaphore(min(len(endpoints), 10))  # Max 10 concurrent tests
         
@@ -513,16 +560,24 @@ class vine:
         
         # Filter valid results
         vulnerable_endpoints = [endpoint for endpoint in results if endpoint]
+        scan_time = time.time() - start_time
         
+        # Print summary
         if vulnerable_endpoints:
             self.message.printMsg(
                 f"Found {len(vulnerable_endpoints)} GraphQL endpoints with introspection enabled",
                 status="success"
             )
-            for endpoint in vulnerable_endpoints:
-                self.message.printMsg(f"Vulnerable: {endpoint}", status="warning")
+            self.message.printMsg(
+                f"Introspection testing completed in {scan_time:.1f} seconds",
+                status="info"
+            )
         else:
-            self.message.printMsg("No GraphQL endpoints with introspection found", status="warning")
+            self.message.printTestResult(
+                "Introspection Testing", 
+                vulnerable=False, 
+                details=f"No GraphQL endpoints with introspection found in {scan_time:.1f} seconds"
+            )
             
         return vulnerable_endpoints
 
@@ -561,6 +616,8 @@ class vine:
             List[str]: List of vulnerable GraphQL endpoints found
         """
         try:
+            start_time = time.time()
+            
             # Configure proxy if provided
             if proxy_string:
                 try:
@@ -600,6 +657,23 @@ class vine:
             # Test for introspection
             self.message.printMsg("Testing endpoints for introspection...", status="success")
             vulnerable_endpoints = await self.introspection(url_list)
+            
+            # Print final summary
+            end_time = time.time()
+            total_time = end_time - start_time
+            
+            if vulnerable_endpoints:
+                self.message.printScanSummary(
+                    tests_run=len(url_list),
+                    vulnerabilities_found=len(vulnerable_endpoints),
+                    scan_time=total_time
+                )
+            else:
+                self.message.printScanSummary(
+                    tests_run=len(url_list),
+                    vulnerabilities_found=0,
+                    scan_time=total_time
+                )
             
             # Return results
             return vulnerable_endpoints
