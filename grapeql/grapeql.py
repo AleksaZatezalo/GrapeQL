@@ -176,8 +176,14 @@ async def run_security_checks(endpoint: str, proxy: str = None, headers=None, co
         cookies: Optional cookies dictionary
         username: Optional username for injection testing
         password: Optional password for injection testing
+        
+    Returns:
+        dict: Results of security checks
     """
     message = grapePrint()
+    basic_vulnerabilities = []
+    injection_vulnerabilities = []
+    engine_info = None
     
     # Run fingerprinting
     message.printMsg("Starting fingerprinting...", status="log")
@@ -197,10 +203,10 @@ async def run_security_checks(endpoint: str, proxy: str = None, headers=None, co
         if cookies:
             security_tester.set_cookies(cookies)
             
-        vulnerabilities = await security_tester.runAllChecks()
+        basic_vulnerabilities = await security_tester.runAllChecks()
         
-        if vulnerabilities:
-            message.printMsg(f"Found {len(vulnerabilities)} potential vulnerabilities", status="warning")
+        if basic_vulnerabilities:
+            message.printMsg(f"Found {len(basic_vulnerabilities)} potential vulnerabilities", status="warning")
         else:
             message.printMsg("No basic vulnerabilities found", status="success")
     
@@ -215,17 +221,18 @@ async def run_security_checks(endpoint: str, proxy: str = None, headers=None, co
         if username and password:
             injection_tester.set_credentials(username, password)
             
-        injection_vulns = await injection_tester.scanForInjection()
+        injection_vulnerabilities = await injection_tester.scanForInjection()
         
-        if injection_vulns:
-            message.printMsg(f"Found {len(injection_vulns)} injection vulnerabilities!", status="failed")
+        if injection_vulnerabilities:
+            message.printMsg(f"Found {len(injection_vulnerabilities)} injection vulnerabilities!", status="failed")
         else:
             message.printMsg("No injection vulnerabilities found", status="success")
     
+    # Return comprehensive results
     return {
         "engine": engine_info,
-        "basic_vulnerabilities": getattr(security_tester, "vulnerabilities", []),
-        "injection_vulnerabilities": injection_vulns if 'injection_vulns' in locals() else []
+        "basic_vulnerabilities": basic_vulnerabilities,
+        "injection_vulnerabilities": injection_vulnerabilities
     }
 
 
@@ -368,7 +375,7 @@ async def main():
         if cookies:
             scanner.set_cookies(cookies)
 
-        vulnerabilities = []
+        all_vulnerabilities = []
         
         # Direct API endpoint testing
         if args.api:
@@ -409,7 +416,7 @@ async def main():
                 password=args.password
             )
             
-            vulnerabilities.append({
+            all_vulnerabilities.append({
                 "endpoint": endpoint,
                 "results": results
             })
@@ -425,9 +432,9 @@ async def main():
                 )
         
         # Generate report if requested
-        if args.report:
+        if args.report and all_vulnerabilities:
             from .report import generate_report
-            generate_report(args.report, vulnerabilities)
+            generate_report(args.report, all_vulnerabilities)
             message.printMsg(f"Report generated: {args.report}", status="success")
 
     except Exception as e:
