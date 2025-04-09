@@ -1,32 +1,25 @@
 """
-Version: 1.0
-Author:Aleksa Zatezalo
-Date: February 2025
+Version: 2.0
+Author: Aleksa Zatezalo
+Date: March 2025
 Description: GraphQL DoS testing module with schema-aware query generation
 """
 
 import asyncio
-import aiohttp
-from typing import Dict, List, Optional, Tuple
-from grapePrint import grapePrint
 import time
+from typing import Dict, List, Optional, Tuple
+from .base_tester import BaseTester
 
 
-class crush:
+class crush(BaseTester):
     """
     A class for testing GraphQL endpoints for various Denial of Service vulnerabilities.
     Generates targeted queries based on introspection of the actual schema.
     """
 
     def __init__(self):
-        """Initialize the DoS tester with default settings and printer."""
-
-        self.message = grapePrint()
-        self.proxy_url: Optional[str] = None
-        self.schema: Optional[Dict] = None
-        self.endpoint: Optional[str] = None
-        self.query_type: Optional[str] = None
-        self.types: Dict[str, Dict] = {}
+        """Initialize the DoS tester with default settings."""
+        super().__init__()
 
     def printVulnerabilityDetails(
         self, vuln_type: str, is_vulnerable: bool, duration: float
@@ -48,100 +41,14 @@ class crush:
                 f"Response time: {duration:.2f} seconds", status="success"
             )
 
-    def configureProxy(self, proxy_host: str, proxy_port: int):
-        """Configure HTTP proxy settings."""
-
-        self.proxy_url = f"http://{proxy_host}:{proxy_port}"
-
-    async def runIntrospection(self, session: aiohttp.ClientSession) -> bool:
-        """
-        Run introspection query to get schema information.
-        """
-
-        query = """
-        query IntrospectionQuery {
-          __schema {
-            queryType {
-              name
-            }
-            types {
-              name
-              fields {
-                name
-                type {
-                  name
-                  kind
-                  ofType {
-                    name
-                    kind
-                  }
-                }
-              }
-            }
-          }
-        }
-        """
-
-        try:
-            async with session.post(
-                self.endpoint,
-                json={"query": query},
-                headers={"Content-Type": "application/json"},
-                timeout=aiohttp.ClientTimeout(total=10),
-                proxy=self.proxy_url,
-                ssl=False,
-            ) as response:
-                if response.status == 200:
-                    result = await response.json()
-                    if result.get("data"):
-                        self.schema = result["data"]["__schema"]
-                        self.query_type = self.schema["queryType"]["name"]
-
-                        # Process types into a more usable format
-                        for type_info in self.schema["types"]:
-                            if type_info.get("fields"):
-                                self.types[type_info["name"]] = {
-                                    "fields": type_info["fields"]
-                                }
-
-                        return True
-
-            self.message.printMsg(
-                "Failed to parse introspection result", status="failed"
-            )
-            return False
-
-        except Exception as e:
-            self.message.printMsg(
-                f"Introspection query failed: {str(e)}", status="failed"
-            )
-            return False
-
     def generateCircularQuery(self) -> str:
         """
         Generate a deeply nested circular query based on schema types that reference each other.
         Creates a complex recursive query pattern to test for DoS vulnerabilities.
         """
-
-        if not self.schema:
-            return ""
-
-        # Get all fields that reference other types
-        circular_refs = []
-        for type_name, type_info in self.types.items():
-            for field in type_info.get("fields", []):
-                field_type = field["type"].get("name") or field["type"].get(
-                    "ofType", {}
-                ).get("name")
-                if field_type in self.types:
-                    circular_refs.append(
-                        {
-                            "type": type_name,
-                            "field": field["name"],
-                            "target": field_type,
-                        }
-                    )
-
+        # Get circular references from schema manager
+        circular_refs = self.schema_manager.find_circular_references()
+        
         if not circular_refs:
             return ""
 
@@ -189,17 +96,12 @@ class crush:
         """
         Generate a query with duplicated fields based on schema.
         """
-
-        if not self.query_type or not self.types.get(self.query_type):
+        if not self.schema_manager.query_type:
             return ""
 
         # Get all scalar fields from the query type
-        scalar_fields = []
-        for field in self.types[self.query_type]["fields"]:
-            field_type = field["type"].get("name")
-            if field_type in ["String", "Int", "Float", "Boolean", "ID"]:
-                scalar_fields.append(field["name"])
-
+        scalar_fields = self.schema_manager.get_scalar_fields(self.schema_manager.query_type)
+        
         if not scalar_fields:
             return ""
 
@@ -211,19 +113,12 @@ class crush:
         """
         Generate a deeply nested query based on schema types.
         """
-
-        if not self.query_type or not self.types.get(self.query_type):
+        if not self.schema_manager.query_type:
             return ""
 
         # Find a field that returns an object type
-        object_fields = []
-        for field in self.types[self.query_type]["fields"]:
-            field_type = field["type"].get("name") or field["type"].get(
-                "ofType", {}
-            ).get("name")
-            if field_type in self.types:
-                object_fields.append(field["name"])
-
+        object_fields = self.schema_manager.get_object_fields(self.schema_manager.query_type)
+        
         if not object_fields:
             return ""
 
@@ -232,7 +127,7 @@ class crush:
         current_query = "id"
         for _ in range(nested_levels):
             current_query = f"""
-            {object_fields[0]} {{
+            {object_fields[0]['name']} {{
                 {current_query}
             }}
             """
@@ -243,12 +138,11 @@ class crush:
         """
         Generate a batch of queries based on schema.
         """
-
-        if not self.query_type or not self.types.get(self.query_type):
+        if not self.schema_manager.query_type or not self.schema_manager.query_fields:
             return []
 
         # Get first available field
-        first_field = next(iter(self.types[self.query_type]["fields"]), None)
+        first_field = next(iter(self.schema_manager.query_fields.keys()), None)
         if not first_field:
             return []
 
@@ -257,7 +151,7 @@ class crush:
             {
                 "query": f"""
             query {{
-                {first_field['name']} {{
+                {first_field} {{
                     id
                 }}
             }}
@@ -271,26 +165,9 @@ class crush:
         Generate a query that attempts to overload the system by creating deep directory-like structures.
         Creates deeply nested fragments and type combinations to stress the resolver.
         """
-
-        if not self.schema or not self.types:
-            return ""
-
-        # Find types that can be nested (have fields that reference other object types)
-        nested_types = []
-        for type_name, type_info in self.types.items():
-            for field in type_info.get("fields", []):
-                field_type = field["type"].get("name") or field["type"].get(
-                    "ofType", {}
-                ).get("name")
-                if field_type in self.types:
-                    nested_types.append(
-                        {
-                            "type": type_name,
-                            "field": field["name"],
-                            "field_type": field_type,
-                        }
-                    )
-
+        # Find nested types using schema manager
+        nested_types = self.schema_manager.find_circular_references()
+        
         if not nested_types:
             return ""
 
@@ -326,7 +203,7 @@ class crush:
             # Create fragment
             fragments.append(
                 f"""
-            fragment {fragment_name} on {type_info['type']} {{
+            fragment {fragment_name} on {type_info["type"]} {{
                 {inner_fields}
             }}
             """
@@ -352,9 +229,7 @@ class crush:
 
         return full_query
 
-    async def testDirectoryOverload(
-        self, session: aiohttp.ClientSession
-    ) -> Tuple[bool, float]:
+    async def testDirectoryOverload(self) -> Tuple[bool, float]:
         """Test for directory overloading vulnerability using schema-based query."""
 
         query = self.generateDirectoryOverload()
@@ -363,56 +238,18 @@ class crush:
 
         start_time = time.time()
         try:
-            async with session.post(
-                self.endpoint,
-                json={"query": query},
-                headers={"Content-Type": "application/json"},
-                timeout=aiohttp.ClientTimeout(total=10),
-                proxy=self.proxy_url,
-                ssl=False,
-            ) as response:
-                duration = time.time() - start_time
-                is_vulnerable = duration > 5 or response.status == 500
-                return is_vulnerable, duration
+            result = await self.client.graphql(query, use_cache=False)
+            duration = time.time() - start_time
+            is_vulnerable = duration > 5 or "errors" in result and any(
+                "timeout" in str(err.get("message", "")).lower() for err in result.get("errors", [])
+            )
+            return is_vulnerable, duration
         except asyncio.TimeoutError:
             return True, 10.0
         except Exception:
             return False, 0.0
 
-    async def setEndpoint(
-        self, endpoint: str, proxy_string: Optional[str] = None
-    ) -> bool:
-        """
-        Set the endpoint and retrieve its schema through introspection.
-
-        Args:
-            endpoint: The GraphQL endpoint URL
-            proxy_string: Optional proxy in format "host:port"
-
-        Returns:
-            bool: True if endpoint was set and schema retrieved successfully
-        """
-
-        self.endpoint = endpoint
-
-        # Configure proxy if provided
-        if proxy_string:
-            try:
-                proxy_host, proxy_port = proxy_string.split(":")
-                self.configureProxy(proxy_host, int(proxy_port))
-            except ValueError:
-                self.message.printMsg(
-                    "Invalid proxy format. Expected host:port", status="failed"
-                )
-                return False
-
-        # Run introspection
-        async with aiohttp.ClientSession() as session:
-            return await self.runIntrospection(session)
-
-    async def testCircularQuery(
-        self, session: aiohttp.ClientSession
-    ) -> Tuple[bool, float]:
+    async def testCircularQuery(self) -> Tuple[bool, float]:
         """Test for circular query vulnerability using schema-based query."""
 
         query = self.generateCircularQuery()
@@ -421,25 +258,18 @@ class crush:
 
         start_time = time.time()
         try:
-            async with session.post(
-                self.endpoint,
-                json={"query": query},
-                headers={"Content-Type": "application/json"},
-                timeout=aiohttp.ClientTimeout(total=10),
-                proxy=self.proxy_url,
-                ssl=False,
-            ) as response:
-                duration = time.time() - start_time
-                is_vulnerable = duration > 5 or response.status == 500
-                return is_vulnerable, duration
+            result = await self.client.graphql(query, use_cache=False)
+            duration = time.time() - start_time
+            is_vulnerable = duration > 5 or "errors" in result and any(
+                "timeout" in str(err.get("message", "")).lower() for err in result.get("errors", [])
+            )
+            return is_vulnerable, duration
         except asyncio.TimeoutError:
             return True, 10.0
         except Exception:
             return False, 0.0
 
-    async def testFieldDuplication(
-        self, session: aiohttp.ClientSession
-    ) -> Tuple[bool, float]:
+    async def testFieldDuplication(self) -> Tuple[bool, float]:
         """Test for field duplication vulnerability using schema-based query."""
 
         query = self.generateFieldDuplication()
@@ -448,25 +278,18 @@ class crush:
 
         start_time = time.time()
         try:
-            async with session.post(
-                self.endpoint,
-                json={"query": query},
-                headers={"Content-Type": "application/json"},
-                timeout=aiohttp.ClientTimeout(total=10),
-                proxy=self.proxy_url,
-                ssl=False,
-            ) as response:
-                duration = time.time() - start_time
-                is_vulnerable = duration > 5 or response.status == 500
-                return is_vulnerable, duration
+            result = await self.client.graphql(query, use_cache=False)
+            duration = time.time() - start_time
+            is_vulnerable = duration > 5 or "errors" in result and any(
+                "timeout" in str(err.get("message", "")).lower() for err in result.get("errors", [])
+            )
+            return is_vulnerable, duration
         except asyncio.TimeoutError:
             return True, 10.0
         except Exception:
             return False, 0.0
 
-    async def testArrayBatching(
-        self, session: aiohttp.ClientSession
-    ) -> Tuple[bool, float]:
+    async def testArrayBatching(self) -> Tuple[bool, float]:
         """Test for array batching vulnerability using schema-based query."""
 
         queries = self.generateArrayBatching()
@@ -475,17 +298,13 @@ class crush:
 
         start_time = time.time()
         try:
-            async with session.post(
-                self.endpoint,
-                json=queries,
-                headers={"Content-Type": "application/json"},
-                timeout=aiohttp.ClientTimeout(total=10),
-                proxy=self.proxy_url,
-                ssl=False,
-            ) as response:
-                duration = time.time() - start_time
-                is_vulnerable = duration > 5 or response.status == 500
-                return is_vulnerable, duration
+            # For batch queries, we need to use a raw request
+            result = await self.client.request("POST", json=queries)
+            duration = time.time() - start_time
+            is_vulnerable = duration > 5 or "errors" in result and any(
+                "timeout" in str(err.get("message", "")).lower() for err in result.get("errors", [])
+            )
+            return is_vulnerable, duration
         except asyncio.TimeoutError:
             return True, 10.0
         except Exception:
@@ -496,31 +315,30 @@ class crush:
         Test the endpoint for all DoS vulnerabilities using schema-based queries.
         """
 
-        if not self.endpoint or not self.schema:
+        if not self.client.endpoint:
             self.message.printMsg(
-                "No endpoint set or schema not retrieved. Run setEndpoint first.",
+                "No endpoint set. Run set_endpoint first.",
                 status="failed",
             )
             return
 
         self.message.printMsg(
-            f"Testing endpoint {self.endpoint} for DOS attacks", status="success"
+            f"Testing endpoint {self.client.endpoint} for DOS attacks", status="success"
         )
         self.message.printMsg(
             f"The application may crash during testing. Please proxy in Burp for further analysis.",
             status="warning",
         )
 
-        async with aiohttp.ClientSession() as session:
-            tests = [
-                ("Circular Query DoS", self.testCircularQuery),
-                ("Field Duplication DoS", self.testFieldDuplication),
-                ("Array Batching DoS", self.testArrayBatching),
-                ("Directory Overloading DoS", self.testDirectoryOverload),
-            ]
+        tests = [
+            ("Circular Query DoS", self.testCircularQuery),
+            ("Field Duplication DoS", self.testFieldDuplication),
+            ("Array Batching DoS", self.testArrayBatching),
+            ("Directory Overloading DoS", self.testDirectoryOverload),
+        ]
 
-            for vuln_type, test_func in tests:
-                self.message.printMsg(f"Testing for {vuln_type}...", status="log")
-                is_vulnerable, duration = await test_func(session)
-                self.printVulnerabilityDetails(vuln_type, is_vulnerable, duration)
-                await asyncio.sleep(10)
+        for vuln_type, test_func in tests:
+            self.message.printMsg(f"Testing for {vuln_type}...", status="log")
+            is_vulnerable, duration = await test_func()
+            self.printVulnerabilityDetails(vuln_type, is_vulnerable, duration)
+            await asyncio.sleep(5)  # Reduced wait time between tests

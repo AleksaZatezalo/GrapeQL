@@ -1,20 +1,24 @@
 """
 Author: Aleksa Zatezalo
-Version: 1.4
-Date: February 2025
-Description: Main file for GrapeQL with command-line argument support and enhanced DoS testing
+Version: 2.0
+Date: March 2025
+Description: Main file for GrapeQL with command-line argument support and unified architecture
 """
 
 import asyncio
 import argparse
 import time
 import json
-from vine import vine
-from root import root
-from crush import crush
-from seeds import seeds
-from juice import juice
-from grapePrint import grapePrint
+from typing import Dict, List, Optional, Any
+
+from .vine import vine
+from .root import root
+from .crush import crush
+from .seeds import seeds
+from .juice import juice
+from .grapePrint import grapePrint
+from .http_client import GraphQLClient
+from .schema_manager import SchemaManager
 
 
 def loadWordlist(wordlist_path):
@@ -27,7 +31,6 @@ def loadWordlist(wordlist_path):
     Returns:
         list: List of endpoints from the file
     """
-
     try:
         with open(wordlist_path, "r") as f:
             return [line.strip() for line in f if line.strip()]
@@ -54,7 +57,7 @@ def load_json_file(file_path):
         return None
 
 
-async def runFingerprinting(endpoint: str, proxy: str = None, headers=None, cookies=None) -> dict:
+async def runFingerprinting(endpoint: str, proxy: str = None, headers=None, cookies=None) -> Dict:
     """
     Run fingerprinting using the root class.
 
@@ -67,12 +70,12 @@ async def runFingerprinting(endpoint: str, proxy: str = None, headers=None, cook
     Returns:
         dict: Information about the detected engine
     """
-
     fingerprinter = root()
+    message = grapePrint()
 
     try:
         # Set endpoint and run introspection
-        if await fingerprinter.setEndpoint(endpoint, proxy):
+        if await fingerprinter.set_endpoint(endpoint, proxy):
             # Set custom headers and cookies if provided
             if headers:
                 fingerprinter.set_headers(headers)
@@ -80,15 +83,22 @@ async def runFingerprinting(endpoint: str, proxy: str = None, headers=None, cook
                 fingerprinter.set_cookies(cookies)
                 
             # Run fingerprinting
-            engine_id = await fingerprinter.fingerprintEngine()
-            return engine_id
+            engine_info = await fingerprinter.fingerprintEngine()
+            
+            if engine_info:
+                message.printMsg(f"Detected {engine_info['name']} GraphQL implementation", status="success")
+                if "technology" in engine_info:
+                    message.printMsg(f"Technology stack: {', '.join(engine_info['technology'])}", status="success")
+                message.printMsg(f"Reference: {engine_info['url']}", status="success")
+            
+            return engine_info
 
     except Exception as e:
-        print(f"Error during fingerprinting: {str(e)}")
+        message.printMsg(f"Error during fingerprinting: {str(e)}", status="error")
         return {
-            "engine": None,
-            "schema_available": False,
-            "endpoint": endpoint,
+            "name": "unknown",
+            "url": "",
+            "engine_id": None,
             "error": str(e),
         }
 
@@ -106,9 +116,8 @@ async def testSingleEndpoint(scanner, api_url, proxy, message, headers=None, coo
         cookies: Optional dictionary of cookies
 
     Returns:
-        int: Exit code (0 for success, 1 for failure)
+        list: List of vulnerable endpoints or empty list
     """
-
     try:
         # Configure proxy if provided
         if proxy:
@@ -123,35 +132,28 @@ async def testSingleEndpoint(scanner, api_url, proxy, message, headers=None, coo
 
         # Test single endpoint
         vulnerable = await scanner.introspection([api_url])
-
-        if vulnerable:
-            return vulnerable
-        return 0
+        return vulnerable
 
     except Exception as e:
-        print(f"Error testing endpoint: {str(e)}")
-        return 1
+        message.printMsg(f"Error testing endpoint: {str(e)}", status="error")
+        return []
 
 
-async def runDosTests(endpoint: str, proxy: str = None, use_crush: bool = False, headers=None, cookies=None):
+async def runDosTests(endpoint: str, proxy: str = None, headers=None, cookies=None):
     """
-    Run DoS testing using either root or crush class based on the argument.
+    Run DoS testing using crush class.
 
     Args:
         endpoint: The GraphQL endpoint to test
         proxy: Optional proxy string in host:port format
-        use_crush: Boolean flag to determine whether to use crush instead of root
         headers: Optional dictionary of custom headers
         cookies: Optional dictionary of cookies
     """
-
     message = grapePrint()
-
-    if use_crush:
-        dos_tester = crush()
+    dos_tester = crush()
 
     # Set the endpoint and get schema
-    if await dos_tester.setEndpoint(endpoint, proxy):
+    if await dos_tester.set_endpoint(endpoint, proxy):
         # Set custom headers and cookies if provided
         if headers:
             dos_tester.set_headers(headers)
@@ -163,13 +165,76 @@ async def runDosTests(endpoint: str, proxy: str = None, use_crush: bool = False,
         message.printMsg("Failed to set endpoint or retrieve schema", status="failed")
 
 
+async def run_security_checks(endpoint: str, proxy: str = None, headers=None, cookies=None, username=None, password=None):
+    """
+    Run all security checks for an endpoint.
+    
+    Args:
+        endpoint: GraphQL endpoint URL
+        proxy: Optional proxy string
+        headers: Optional headers dictionary
+        cookies: Optional cookies dictionary
+        username: Optional username for injection testing
+        password: Optional password for injection testing
+    """
+    message = grapePrint()
+    
+    # Run fingerprinting
+    message.printMsg("Starting fingerprinting...", status="log")
+    engine_info = await runFingerprinting(
+        endpoint=endpoint, 
+        proxy=proxy, 
+        headers=headers, 
+        cookies=cookies
+    )
+    
+    # Run basic security checks
+    message.printMsg("Starting basic security checks...", status="log")
+    security_tester = seeds()
+    if await security_tester.set_endpoint(endpoint, proxy):
+        if headers:
+            security_tester.set_headers(headers)
+        if cookies:
+            security_tester.set_cookies(cookies)
+            
+        vulnerabilities = await security_tester.runAllChecks()
+        
+        if vulnerabilities:
+            message.printMsg(f"Found {len(vulnerabilities)} potential vulnerabilities", status="warning")
+        else:
+            message.printMsg("No basic vulnerabilities found", status="success")
+    
+    # Run command injection tests
+    message.printMsg("Starting injection tests...", status="log")
+    injection_tester = juice()
+    if await injection_tester.set_endpoint(endpoint, proxy):
+        if headers:
+            injection_tester.set_headers(headers)
+        if cookies:
+            injection_tester.set_cookies(cookies)
+        if username and password:
+            injection_tester.set_credentials(username, password)
+            
+        injection_vulns = await injection_tester.scanForInjection()
+        
+        if injection_vulns:
+            message.printMsg(f"Found {len(injection_vulns)} injection vulnerabilities!", status="failed")
+        else:
+            message.printMsg("No injection vulnerabilities found", status="success")
+    
+    return {
+        "engine": engine_info,
+        "basic_vulnerabilities": getattr(security_tester, "vulnerabilities", []),
+        "injection_vulnerabilities": injection_vulns if 'injection_vulns' in locals() else []
+    }
+
+
 async def main():
     """
     Main function to handle command-line arguments and perform graphql scanning.
     """
-
     parser = argparse.ArgumentParser(
-        description="GraphQL Endpoint Scanner with Optional Proxy Support",
+        description="GraphQL Security Testing Tool with Proxy Support",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
@@ -246,13 +311,16 @@ async def main():
         help="Authorization token type (e.g., Bearer, Basic). Default is Bearer.",
         default="Bearer"
     )
+    
+    parser.add_argument(
+        "--report",
+        help="Generate a report file with the specified filename",
+    )
 
     args = parser.parse_args()
 
     try:
         scanner = vine()
-        seed = seeds()
-        juicey = juice()
         message = grapePrint()
 
         message.intro()
@@ -292,24 +360,23 @@ async def main():
         # Set authentication token if provided
         if args.auth:
             headers['Authorization'] = f"{args.auth_type} {args.auth}" if args.auth_type else args.auth
-
-        juicey.setCredentials(args.username, args.password)
         
-        # Set custom headers and cookies
+        # Set custom headers and cookies for the scanner
         if headers:
-            juicey.set_headers(headers)
-            # message.printMsg(f"Using {len(headers)} custom headers", status="success")
-        
+            scanner.set_headers(headers)
+            
         if cookies:
-            juicey.set_cookies(cookies)
-            # message.printMsg(f"Using {len(cookies)} cookies", status="success")
+            scanner.set_cookies(cookies)
 
+        vulnerabilities = []
+        
         # Direct API endpoint testing
         if args.api:
-            introspection = await testSingleEndpoint(
+            message.printMsg(f"Testing specific endpoint: {args.api}", status="log")
+            vulnerable_endpoints = await testSingleEndpoint(
                 scanner, args.api, args.proxy, message, headers, cookies
             )
-
+        
         # Full scan mode
         else:
             # Load custom wordlist if specified
@@ -319,58 +386,52 @@ async def main():
                     return 1
                 scanner.setApiList(wordlist)
                 
-            # Set custom headers and cookies
-            if headers:
-                scanner.set_headers(headers)
-            
-            if cookies:
-                scanner.set_cookies(cookies)
-
-            # Call test with None for proxy if not provided
-            introspection = await scanner.test(
+            message.printMsg(f"Starting scan of target: {args.target}", status="log")
+            vulnerable_endpoints = await scanner.test(
                 args.proxy if args.proxy else None, args.target
             )
 
-        if introspection:
-            time.sleep(2)
-            await runFingerprinting(
-                endpoint=introspection[0], 
-                proxy=args.proxy if args.proxy else None,
+        if not vulnerable_endpoints:
+            message.printMsg("No vulnerable GraphQL endpoints found", status="log")
+            return 0
+            
+        message.printMsg(f"Found {len(vulnerable_endpoints)} vulnerable GraphQL endpoints", status="success")
+        
+        # Run security checks for each vulnerable endpoint
+        for endpoint in vulnerable_endpoints:
+            message.printMsg(f"Running security checks on: {endpoint}", status="log")
+            results = await run_security_checks(
+                endpoint=endpoint,
+                proxy=args.proxy,
                 headers=headers,
-                cookies=cookies
-            )
-
-            time.sleep(2)
-            await seed.setEndpoint(
-                introspection[0], proxy=args.proxy if args.proxy else None
+                cookies=cookies,
+                username=args.username,
+                password=args.password
             )
             
-            # Set custom headers and cookies for seeds
-            if headers:
-                seed.set_headers(headers)
+            vulnerabilities.append({
+                "endpoint": endpoint,
+                "results": results
+            })
             
-            if cookies:
-                seed.set_cookies(cookies)
-                
-            await seed.runAllChecks()
-
-            await juicey.setEndpoint(
-                introspection[0], proxy=args.proxy if args.proxy else None
-            )
-
-            await juicey.scanForInjection()
-
+            # Run DoS tests if requested
             if args.crush:
+                message.printMsg(f"Running DoS tests on: {endpoint}", status="log")
                 await runDosTests(
-                    endpoint=introspection[0],
-                    proxy=args.proxy if args.proxy else None,
-                    use_crush=True,
+                    endpoint=endpoint,
+                    proxy=args.proxy,
                     headers=headers,
                     cookies=cookies
                 )
+        
+        # Generate report if requested
+        if args.report:
+            from .report import generate_report
+            generate_report(args.report, vulnerabilities)
+            message.printMsg(f"Report generated: {args.report}", status="success")
 
     except Exception as e:
-        print(f"Error during scan: {str(e)}")
+        message.printMsg(f"Error during scan: {str(e)}", status="error")
         return 1
 
     return 0

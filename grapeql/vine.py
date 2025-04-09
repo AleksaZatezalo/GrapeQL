@@ -1,25 +1,23 @@
 """
-Author: Original by Aleksa Zatezalo, Modified Version
-Version: 1.1
-Date: February 2025
-Description: Enumeration script for GraphQL endpoints with proxy support for HTTP operations. 
-Port scanning is performed directly while directory busting and introspection are proxied.
+Author: Aleksa Zatezalo
+Version: 2.0
+Date: March 2025
+Description: Enumeration script for GraphQL endpoints with proxy support for HTTP operations.
 """
 
 import asyncio
 import aiohttp
-from typing import Dict, List, Optional
-from grapePrint import grapePrint
-from headers_manager import HeadersManager
-import time
 import socket
+from typing import Dict, List, Optional, Set
+from .grapePrint import grapePrint
+from .http_client import GraphQLClient
+import time
 
 
 class vine:
     """
-    A class for scanning and identifying GraphQL endpoints with introspection enabled.
-    Supports proxying HTTP traffic through Burpsuite while performing direct port scans.
-    Now with custom headers and cookies support.
+    A class for discovering GraphQL endpoints through port scanning and directory enumeration.
+    Supports proxying HTTP traffic through a proxy while performing direct port scans.
     """
 
     def __init__(self):
@@ -27,7 +25,8 @@ class vine:
         Initialize the vine class with default settings and API endpoints list.
         """
         self.message = grapePrint()
-        self.apiList = [
+        self.client = GraphQLClient()
+        self.default_api_paths = [
             "/graphql",
             "/graphql/playground",
             "/graphiql",
@@ -42,71 +41,29 @@ class vine:
             "/admin/graphql",
             "/user/graphql",
         ]
-        self.proxy_url: Optional[str] = None
-        self.headers_manager = HeadersManager()
+        self.api_paths = self.default_api_paths.copy()
 
-    def configureProxy(self, proxy_host: str, proxy_port: int):
-        """
-        Configure the HTTP proxy settings for Burpsuite.
-
-        Args:
-            proxy_host: The proxy server hostname or IP
-            proxy_port: The proxy server port
-        """
-
-        self.proxy_url = f"http://{proxy_host}:{proxy_port}"
-
-    def set_header(self, name: str, value: str):
-        """
-        Set a custom header.
-        
-        Args:
-            name: Header name
-            value: Header value
-        """
-        self.headers_manager.add_header(name, value)
+    def set_header(self, name: str, value: str) -> None:
+        """Set a custom header."""
+        self.client.set_header(name, value)
         self.message.printMsg(f"Set header {name}: {value}", status="success")
 
-    def set_headers(self, headers: Dict[str, str]):
-        """
-        Set multiple custom headers.
-        
-        Args:
-            headers: Dictionary of header name/value pairs
-        """
-        self.headers_manager.add_headers(headers)
-        # self.message.printMsg(f"Set {len(headers)} custom headers", status="success")
+    def set_headers(self, headers: Dict[str, str]) -> None:
+        """Set multiple custom headers."""
+        self.client.set_headers(headers)
 
-    def set_cookie(self, name: str, value: str):
-        """
-        Set a cookie.
-        
-        Args:
-            name: Cookie name
-            value: Cookie value
-        """
-        self.headers_manager.add_cookie(name, value)
+    def set_cookie(self, name: str, value: str) -> None:
+        """Set a custom cookie."""
+        self.client.set_cookie(name, value)
         self.message.printMsg(f"Set cookie {name}: {value}", status="success")
 
-    def set_cookies(self, cookies: Dict[str, str]):
-        """
-        Set multiple cookies.
-        
-        Args:
-            cookies: Dictionary of cookie name/value pairs
-        """
-        self.headers_manager.add_cookies(cookies)
-        # self.message.printMsg(f"Set {len(cookies)} cookies", status="success")
+    def set_cookies(self, cookies: Dict[str, str]) -> None:
+        """Set multiple custom cookies."""
+        self.client.set_cookies(cookies)
 
-    def set_authorization(self, token: str, prefix: str = "Bearer"):
-        """
-        Set Authorization header.
-        
-        Args:
-            token: Authorization token
-            prefix: Token type prefix (default: "Bearer")
-        """
-        self.headers_manager.set_authorization(token, prefix)
+    def set_authorization(self, token: str, prefix: str = "Bearer") -> None:
+        """Set authorization header."""
+        self.client.set_authorization(token, prefix)
         self.message.printMsg(f"Set authorization token with prefix '{prefix}'", status="success")
 
     def setApiList(self, endpoints: List[str]) -> bool:
@@ -118,12 +75,7 @@ class vine:
 
         Returns:
             bool: True if endpoints were set successfully, False otherwise
-
-        Example:
-            scanner = vine()
-            scanner.setApiList(['/graphql', '/api/graphql', '/v1/graphql'])
         """
-
         try:
             # Validate input is a list
             if not isinstance(endpoints, list):
@@ -132,7 +84,7 @@ class vine:
                 )
                 return False
 
-            # Validate each endpoint
+            # Validate and clean each endpoint
             cleaned_endpoints = []
             for endpoint in endpoints:
                 # Check if endpoint is a string
@@ -163,7 +115,7 @@ class vine:
                 return False
 
             # Set the new API list
-            self.apiList = cleaned_endpoints
+            self.api_paths = cleaned_endpoints
             self.message.printMsg(
                 f"Successfully set {len(cleaned_endpoints)} endpoints", status="success"
             )
@@ -172,6 +124,16 @@ class vine:
         except Exception as e:
             self.message.printMsg(f"Error setting API list: {str(e)}", status="error")
             return False
+
+    def configureProxy(self, proxy_host: str, proxy_port: int) -> None:
+        """
+        Configure the HTTP proxy settings.
+
+        Args:
+            proxy_host: The proxy server hostname or IP
+            proxy_port: The proxy server port
+        """
+        self.client.configure_proxy(proxy_host, proxy_port)
 
     async def testPortNumber(self, host: str, port: int) -> bool:
         """
@@ -184,10 +146,9 @@ class vine:
         Returns:
             bool: True if port is open, False otherwise
         """
-
         try:
             future = asyncio.open_connection(host, port)
-            _, writer = await asyncio.wait_for(future, timeout=0.5)
+            reader, writer = await asyncio.wait_for(future, timeout=0.5)
             writer.close()
             await writer.wait_closed()
             return True
@@ -208,7 +169,6 @@ class vine:
         Returns:
             List[int]: List of open ports found in the specified range
         """
-
         tasks = []
         for port in range(start_port, end_port + 1):
             tasks.append(self.testPortNumber(host, port))
@@ -233,7 +193,6 @@ class vine:
         Returns:
             List[int]: Sorted list of all open ports found on the host
         """
-
         chunk_size = 1000
         open_ports = []
 
@@ -244,46 +203,43 @@ class vine:
 
         return sorted(open_ports)
 
-    async def dirb(
-        self, session: aiohttp.ClientSession, base_url: str, path: str
-    ) -> Optional[str]:
+    async def dirb(self, base_url: str, path: str) -> Optional[str]:
         """
-        Test a single endpoint path for existence on the target URL through Burp proxy.
+        Test a single endpoint path for existence on the target URL.
         Filters out WebSocket endpoints.
 
         Args:
-            session: The aiohttp client session to use for requests
             base_url: The base URL to test against
             path: The endpoint path to append to the base URL
 
         Returns:
             Optional[str]: Full URL if endpoint exists and is not a WebSocket endpoint, None otherwise
         """
-
         full_url = f"{base_url.rstrip('/')}/{path.lstrip('/')}"
+        
         try:
-            async with session.get(
-                full_url,
-                timeout=aiohttp.ClientTimeout(total=5),
-                proxy=self.proxy_url,
-                ssl=False,  # Required for Burp to intercept HTTPS
-                headers=self.headers_manager.get_all_headers(),
-                cookies=self.headers_manager.get_all_cookies(),
-            ) as response:
-                if response.status != 404:
-                    # Check if response contains WebSocket text
-                    response_text = await response.text()
-                    if "WebSockets request was expected" not in response_text:
-                        return full_url
-
+            # Set the URL for this request only, without changing the client's endpoint
+            result = await self.client.request("GET", full_url)
+            
+            # Inspect the response status
+            status = result.get("status")
+            if status == 404:
+                return None
+                
+            # Check for WebSocket indication
+            response_text = result.get("text", "")
+            if "WebSockets request was expected" in response_text:
+                return None
+                
+            return full_url
+                
         except Exception as e:
             self.message.printMsg(f"Error testing {full_url}: {str(e)}", status="error")
-
-        return None
+            return None
 
     async def scanEndpoints(self, base_url: str) -> List[str]:
         """
-        Scan all API endpoints concurrently on a given base URL through Burp proxy.
+        Scan all API endpoints concurrently on a given base URL.
 
         Args:
             base_url: The base URL to test endpoints against
@@ -291,10 +247,8 @@ class vine:
         Returns:
             List[str]: List of valid endpoint URLs found
         """
-
-        async with aiohttp.ClientSession() as session:
-            tasks = [self.dirb(session, base_url, path) for path in self.apiList]
-            results = await asyncio.gather(*tasks)
+        tasks = [self.dirb(base_url, path) for path in self.api_paths]
+        results = await asyncio.gather(*tasks)
         return [result for result in results if result]
 
     async def constructAddress(self, ip: str) -> List[str]:
@@ -307,15 +261,14 @@ class vine:
         Returns:
             List[str]: List of URLs constructed from open ports
         """
-
         self.message.printMsg("Beginning Direct Port Scan", status="success")
-        time.sleep(3)
+        time.sleep(1)
         ports = await self.scanIP(host=ip)
         return [f"http://{ip}:{port}" for port in ports]
 
     async def dirbList(self, valid_endpoints: List[str]) -> List[str]:
         """
-        Perform directory busting on a list of endpoints through Burp proxy.
+        Perform directory busting on a list of endpoints.
 
         Args:
             valid_endpoints: List of base URLs to test
@@ -323,9 +276,8 @@ class vine:
         Returns:
             List[str]: List of all valid URLs found
         """
-
         self.message.printMsg("Started directory busting", status="success")
-        time.sleep(3)
+        time.sleep(1)
         url_list = []
         for endpoint in valid_endpoints:
             found_urls = await self.scanEndpoints(endpoint)
@@ -334,59 +286,29 @@ class vine:
                 url_list.append(url)
         return url_list
 
-    async def checkEndpoint(
-        self, endpoint: str, session: aiohttp.ClientSession
-    ) -> Optional[str]:
+    async def checkEndpoint(self, endpoint: str) -> Optional[str]:
         """
-        Test a single endpoint for GraphQL introspection vulnerability through Burp proxy.
+        Test a single endpoint for GraphQL introspection vulnerability.
 
         Args:
             endpoint: The endpoint URL to test
-            session: The aiohttp client session to use for requests
 
         Returns:
             Optional[str]: Endpoint URL if vulnerable, None otherwise
         """
-
-        query = """
-        query {
-            __schema {
-                types {
-                    name
-                }
-            }
-        }
-        """
-
-        try:
-            async with session.post(
-                endpoint,
-                json={"query": query},
-                headers=self.headers_manager.get_all_headers(),
-                cookies=self.headers_manager.get_all_cookies(),
-                timeout=aiohttp.ClientTimeout(total=5),
-                proxy=self.proxy_url,
-                ssl=False,  # Required for Burp to intercept HTTPS
-            ) as response:
-                if response.status == 200:
-                    try:
-                        result = await response.json()
-                        if result and isinstance(result, dict):
-                            if result.get("data", {}).get("__schema"):
-                                self.message.printMsg(
-                                    f"Introspection enabled: {endpoint}",
-                                    status="warning",
-                                )
-                                return endpoint
-                    except (aiohttp.ContentTypeError, ValueError):
-                        pass
-        except Exception as e:
-            self.message.printMsg(f"Error testing {endpoint}: {str(e)}", status="error")
+        # Set the endpoint temporarily for this test
+        self.client.set_endpoint(endpoint)
+        
+        # Check if introspection is enabled
+        if await self.client.has_introspection():
+            self.message.printMsg(f"Introspection enabled: {endpoint}", status="warning")
+            return endpoint
+            
         return None
 
     async def introspection(self, endpoints: List[str]) -> List[str]:
         """
-        Test multiple endpoints for GraphQL introspection vulnerability through Burp proxy.
+        Test multiple endpoints for GraphQL introspection vulnerability.
 
         Args:
             endpoints: List of endpoints to test
@@ -394,18 +316,16 @@ class vine:
         Returns:
             List[str]: List of vulnerable endpoints with introspection enabled
         """
-
         self.message.printMsg("Testing for introspection query", status="success")
-        time.sleep(3)
+        time.sleep(1)
 
-        async with aiohttp.ClientSession() as session:
-            tasks = [self.checkEndpoint(endpoint, session) for endpoint in endpoints]
-            results = await asyncio.gather(*tasks)
+        tasks = [self.checkEndpoint(endpoint) for endpoint in endpoints]
+        results = await asyncio.gather(*tasks)
         return [endpoint for endpoint in results if endpoint]
 
     def validate_proxy(self, proxy_host: str, proxy_port: int) -> bool:
         """
-        Validate that Burpsuite proxy is accessible.
+        Validate that proxy is accessible.
 
         Args:
             proxy_host: The proxy server hostname or IP
@@ -414,7 +334,6 @@ class vine:
         Returns:
             bool: True if proxy is valid and accessible, False otherwise
         """
-
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(5)
@@ -423,11 +342,11 @@ class vine:
             return True
         except Exception as e:
             self.message.printMsg(
-                f"Burp proxy validation failed: {str(e)}", status="error"
+                f"Proxy validation failed: {str(e)}", status="error"
             )
             return False
 
-    async def test(self, proxy_string: str = None, target_ip: str = None):
+    async def test(self, proxy_string: str = None, target_ip: str = None) -> List[str]:
         """
         Main execution function that coordinates the scanning process.
 
@@ -438,7 +357,6 @@ class vine:
         Returns:
             List[str]: List of vulnerable GraphQL endpoints found
         """
-
         try:
             # Configure proxy if provided
             if proxy_string:
