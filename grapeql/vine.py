@@ -1,14 +1,14 @@
 """
 Author: Aleksa Zatezalo
-Version: 2.0
+Version: 2.1
 Date: March 2025
-Description: Enumeration script for GraphQL endpoints with proxy support for HTTP operations.
+Description: Optimized enumeration script for GraphQL endpoints with improved performance.
 """
 
 import asyncio
 import aiohttp
 import socket
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Tuple
 from grapePrint import grapePrint
 from http_client import GraphQLClient
 import time
@@ -42,6 +42,12 @@ class vine:
             "/user/graphql",
         ]
         self.api_paths = self.default_api_paths.copy()
+        # Configurable parameters
+        self.max_concurrent_scans = 50  # Maximum concurrent directory requests
+        self.chunk_size = 5000  # Port scan chunk size
+        self.port_scan_timeout = 0.5  # Port scan connection timeout
+        self.dirb_timeout = 5  # Directory busting timeout
+        self.common_ports = [80, 443, 8080, 8443, 3000, 4000, 5013, 8000, 8888]  # Common ports to prioritize
 
     def set_header(self, name: str, value: str) -> None:
         """Set a custom header."""
@@ -135,7 +141,7 @@ class vine:
         """
         self.client.configure_proxy(proxy_host, proxy_port)
 
-    async def testPortNumber(self, host: str, port: int) -> bool:
+    async def testPortNumber(self, host: str, port: int) -> Tuple[int, bool]:
         """
         Test if a specific port is open on the target host (direct connection, no proxy).
 
@@ -144,64 +150,65 @@ class vine:
             port: The port number to test
 
         Returns:
-            bool: True if port is open, False otherwise
+            Tuple[int, bool]: Port number and whether it's open
         """
         try:
             future = asyncio.open_connection(host, port)
-            reader, writer = await asyncio.wait_for(future, timeout=0.5)
+            reader, writer = await asyncio.wait_for(future, timeout=self.port_scan_timeout)
             writer.close()
             await writer.wait_closed()
-            return True
+            return port, True
         except:
-            return False
+            return port, False
 
-    async def scanPortRange(
-        self, host: str, start_port: int, end_port: int
-    ) -> List[int]:
+    async def prioritized_port_scan(self, host: str) -> List[int]:
         """
-        Scan a range of ports concurrently on the target host (direct connection).
-
+        Optimized port scanning with prioritization of common ports.
+        
         Args:
             host: The target hostname or IP address
-            start_port: The starting port number in the range
-            end_port: The ending port number in the range
-
+        
         Returns:
-            List[int]: List of open ports found in the specified range
+            List[int]: List of open ports
         """
-        tasks = []
-        for port in range(start_port, end_port + 1):
-            tasks.append(self.testPortNumber(host, port))
-
-        results = await asyncio.gather(*tasks)
-
-        open_ports = []
-        for port, is_open in zip(range(start_port, end_port + 1), results):
-            if is_open:
+        # First scan common ports
+        common_port_tasks = [self.testPortNumber(host, port) for port in self.common_ports]
+        common_results = await asyncio.gather(*common_port_tasks)
+        
+        # Filter open common ports
+        open_ports = [port for port, is_open in common_results if is_open]
+        
+        # If we've found ports in the common list, we can skip the full scan to save time
+        if open_ports:
+            self.message.printMsg(f"Found {len(open_ports)} open common ports, skipping full scan", status="success")
+            for port in open_ports:
                 self.message.printMsg(f"{host}:{port} [OPEN]")
-                open_ports.append(port)
-
-        return open_ports
-
-    async def scanIP(self, host: str = "127.0.0.1") -> List[int]:
-        """
-        Scan all ports on a target host in chunks (direct connection).
-
-        Args:
-            host: The target hostname or IP address (default: "127.0.0.1")
-
-        Returns:
-            List[int]: Sorted list of all open ports found on the host
-        """
-        chunk_size = 1000
-        open_ports = []
-
-        for start_port in range(1, 65536, chunk_size):
-            end_port = min(start_port + chunk_size - 1, 65535)
-            chunk_results = await self.scanPortRange(host, start_port, end_port)
-            open_ports.extend(chunk_results)
-
-        return sorted(open_ports)
+            return open_ports
+        
+        self.message.printMsg("No common ports open, performing selective scan", status="log")
+        
+        # Selective port ranges to scan based on common web services
+        port_ranges = [
+            (80, 90),    # HTTP/S
+            (443, 450),  # HTTPS
+            (3000, 3010), # Development servers
+            (4000, 4010), # Development servers
+            (8000, 8100), # Common web ports
+            (8443, 8453), # HTTPS alt
+        ]
+        
+        all_open_ports = []
+        for start, end in port_ranges:
+            tasks = [self.testPortNumber(host, port) for port in range(start, end + 1)]
+            results = await asyncio.gather(*tasks)
+            range_open_ports = [port for port, is_open in results if is_open]
+            all_open_ports.extend(range_open_ports)
+            
+            # Print results for this range
+            for port in range_open_ports:
+                self.message.printMsg(f"{host}:{port} [OPEN]")
+        
+        return all_open_ports
 
     async def dirb(self, base_url: str, path: str) -> Optional[str]:
         """
@@ -219,7 +226,12 @@ class vine:
         
         try:
             # Set the URL for this request only, without changing the client's endpoint
-            result = await self.client.request("GET", full_url)
+            result = await self.client.request(
+                "GET", 
+                full_url, 
+                timeout=self.dirb_timeout,
+                use_cache=True  # Enable caching to avoid duplicate requests
+            )
             
             # Inspect the response status
             status = result.get("status")
@@ -231,15 +243,40 @@ class vine:
             if "WebSockets request was expected" in response_text:
                 return None
                 
+            # Check for GraphQL indicators in the response
+            graphql_indicators = ["graphql", "apollo", "playground", "__schema"]
+            for indicator in graphql_indicators:
+                if indicator.lower() in str(response_text).lower():
+                    self.message.printMsg(f"Potential GraphQL endpoint found: {full_url}", status="success")
+                    return full_url
+                
             return full_url
                 
         except Exception as e:
-            self.message.printMsg(f"Error testing {full_url}: {str(e)}", status="error")
             return None
+
+    async def batch_dirb(self, base_url: str, paths: List[str]) -> List[str]:
+        """
+        Test a batch of endpoint paths concurrently.
+        
+        Args:
+            base_url: The base URL to test against
+            paths: List of paths to test
+            
+        Returns:
+            List[str]: List of valid URLs
+        """
+        tasks = []
+        for path in paths:
+            task = self.dirb(base_url, path)
+            tasks.append(task)
+            
+        results = await asyncio.gather(*tasks)
+        return [url for url in results if url]
 
     async def scanEndpoints(self, base_url: str) -> List[str]:
         """
-        Scan all API endpoints concurrently on a given base URL.
+        Scan all API endpoints with optimized concurrency.
 
         Args:
             base_url: The base URL to test endpoints against
@@ -247,13 +284,28 @@ class vine:
         Returns:
             List[str]: List of valid endpoint URLs found
         """
-        tasks = [self.dirb(base_url, path) for path in self.api_paths]
-        results = await asyncio.gather(*tasks)
-        return [result for result in results if result]
+        # Split API paths into batches for controlled concurrency
+        results = []
+        
+        # Use a semaphore to limit concurrent connections
+        semaphore = asyncio.Semaphore(self.max_concurrent_scans)
+        
+        async def scan_with_semaphore(path):
+            async with semaphore:
+                return await self.dirb(base_url, path)
+        
+        # Create tasks for all paths
+        tasks = [scan_with_semaphore(path) for path in self.api_paths]
+        
+        # Run all tasks concurrently but with controlled parallelism
+        batch_results = await asyncio.gather(*tasks)
+        
+        # Filter out None values
+        return [url for url in batch_results if url]
 
     async def constructAddress(self, ip: str) -> List[str]:
         """
-        Construct full URLs for all open ports on a target IP.
+        Construct full URLs for open ports on a target IP with optimized scanning.
 
         Args:
             ip: The target IP address
@@ -261,14 +313,44 @@ class vine:
         Returns:
             List[str]: List of URLs constructed from open ports
         """
-        self.message.printMsg("Beginning Direct Port Scan", status="success")
-        time.sleep(1)
-        ports = await self.scanIP(host=ip)
-        return [f"http://{ip}:{port}" for port in ports]
+        self.message.printMsg("Beginning Optimized Port Scan", status="success")
+        open_ports = await self.prioritized_port_scan(host=ip)
+        
+        # If no ports found, try additional port ranges 
+        if not open_ports:
+            self.message.printMsg("No ports found in initial scan, checking additional ranges", status="log")
+            time.sleep(1)
+            
+            # Scan top 1000 ports in chunks for better performance
+            additional_ranges = [
+                (1, 1000),       # Top 1000 common ports
+                (7000, 7100),    # Additional ranges likely to have web servers
+                (9000, 9100)
+            ]
+            
+            for start, end in additional_ranges:
+                self.message.printMsg(f"Scanning port range {start}-{end}", status="log")
+                chunk_size = 100  # Smaller chunks for better feedback
+                for chunk_start in range(start, end + 1, chunk_size):
+                    chunk_end = min(chunk_start + chunk_size - 1, end)
+                    
+                    # Create tasks for this chunk
+                    tasks = [self.testPortNumber(ip, port) for port in range(chunk_start, chunk_end + 1)]
+                    results = await asyncio.gather(*tasks)
+                    
+                    # Find open ports in this chunk
+                    chunk_open_ports = [port for port, is_open in results if is_open]
+                    if chunk_open_ports:
+                        for port in chunk_open_ports:
+                            self.message.printMsg(f"{ip}:{port} [OPEN]")
+                        open_ports.extend(chunk_open_ports)
+        
+        # Convert ports to URLs
+        return [f"http://{ip}:{port}" for port in open_ports]
 
     async def dirbList(self, valid_endpoints: List[str]) -> List[str]:
         """
-        Perform directory busting on a list of endpoints.
+        Perform directory busting on a list of endpoints with optimized concurrency.
 
         Args:
             valid_endpoints: List of base URLs to test
@@ -276,15 +358,46 @@ class vine:
         Returns:
             List[str]: List of all valid URLs found
         """
-        self.message.printMsg("Started directory busting", status="success")
-        time.sleep(1)
-        url_list = []
+        if not valid_endpoints:
+            self.message.printMsg("No valid endpoints found for directory busting", status="warning")
+            return []
+            
+        self.message.printMsg(f"Started directory busting against {len(valid_endpoints)} endpoints", status="success")
+        
+        # Progress feedback
+        total_endpoints = len(valid_endpoints)
+        completed = 0
+        start_time = time.time()
+        
+        # Process each base URL with optimized scanning
+        all_valid_urls = []
+        
         for endpoint in valid_endpoints:
+            self.message.printMsg(f"Scanning endpoint {endpoint} ({completed+1}/{total_endpoints})", status="log")
             found_urls = await self.scanEndpoints(endpoint)
+            
             for url in found_urls:
                 self.message.printMsg(f"Found URL at {url}")
-                url_list.append(url)
-        return url_list
+                all_valid_urls.append(url)
+                
+            completed += 1
+            elapsed = time.time() - start_time
+            avg_time = elapsed / completed if completed > 0 else 0
+            remaining = avg_time * (total_endpoints - completed)
+            
+            # Only show timing updates for multiple endpoints
+            if total_endpoints > 1:
+                self.message.printMsg(
+                    f"Progress: {completed}/{total_endpoints} endpoints scanned. " +
+                    f"Est. {int(remaining)} seconds remaining.", 
+                    status="log"
+                )
+        
+        self.message.printMsg(
+            f"Directory busting completed. Found {len(all_valid_urls)} potential GraphQL endpoints.",
+            status="log"
+        )
+        return all_valid_urls
 
     async def checkEndpoint(self, endpoint: str) -> Optional[str]:
         """
@@ -308,7 +421,7 @@ class vine:
 
     async def introspection(self, endpoints: List[str]) -> List[str]:
         """
-        Test multiple endpoints for GraphQL introspection vulnerability.
+        Test multiple endpoints for GraphQL introspection vulnerability with optimized concurrency.
 
         Args:
             endpoints: List of endpoints to test
@@ -316,12 +429,37 @@ class vine:
         Returns:
             List[str]: List of vulnerable endpoints with introspection enabled
         """
-        self.message.printMsg("Testing for introspection query", status="success")
-        time.sleep(1)
-
-        tasks = [self.checkEndpoint(endpoint) for endpoint in endpoints]
+        if not endpoints:
+            self.message.printMsg("No endpoints to test for introspection", status="warning")
+            return []
+            
+        self.message.printMsg(f"Testing {len(endpoints)} endpoints for introspection", status="success")
+        
+        # Use a semaphore to limit concurrent connections
+        semaphore = asyncio.Semaphore(min(len(endpoints), 10))  # Max 10 concurrent tests
+        
+        async def check_with_semaphore(endpoint):
+            async with semaphore:
+                return await self.checkEndpoint(endpoint)
+        
+        # Create tasks with semaphore
+        tasks = [check_with_semaphore(endpoint) for endpoint in endpoints]
+        
+        # Run all tasks concurrently but with controlled parallelism
         results = await asyncio.gather(*tasks)
-        return [endpoint for endpoint in results if endpoint]
+        
+        # Filter valid results
+        vulnerable_endpoints = [endpoint for endpoint in results if endpoint]
+        
+        if vulnerable_endpoints:
+            self.message.printMsg(
+                f"Found {len(vulnerable_endpoints)} GraphQL endpoints with introspection enabled",
+                status="log"
+            )
+        else:
+            self.message.printMsg("No GraphQL endpoints with introspection found", status="warning")
+            
+        return vulnerable_endpoints
 
     def validate_proxy(self, proxy_host: str, proxy_port: int) -> bool:
         """
@@ -348,7 +486,7 @@ class vine:
 
     async def test(self, proxy_string: str = None, target_ip: str = None) -> List[str]:
         """
-        Main execution function that coordinates the scanning process.
+        Main execution function that coordinates the scanning process with optimized performance.
 
         Args:
             proxy_string: Optional string containing proxy host and port in format "host:port"
@@ -380,10 +518,51 @@ class vine:
                     )
                     return []
 
-            # Perform scan using provided target IP
+            # Perform scan using provided target IP with optimized methods
+            start_time = time.time()
             valid_endpoints = await self.constructAddress(target_ip)
+            port_scan_time = time.time() - start_time
+            
+            self.message.printMsg(
+                f"Port scan completed in {port_scan_time:.1f} seconds. Found {len(valid_endpoints)} open ports.",
+                status="success"
+            )
+            
+            if not valid_endpoints:
+                self.message.printMsg("No open ports found. Scan cannot continue.", status="error")
+                return []
+                
+            # Perform directory busting
+            start_time = time.time()
             url_list = await self.dirbList(valid_endpoints)
-            return await self.introspection(url_list)
+            dirb_time = time.time() - start_time
+            
+            self.message.printMsg(
+                f"Directory busting completed in {dirb_time:.1f} seconds.",
+                status="success"
+            )
+            
+            if not url_list:
+                self.message.printMsg("No potential GraphQL endpoints found.", status="warning")
+                return []
+                
+            # Test for introspection
+            start_time = time.time()
+            vulnerable_endpoints = await self.introspection(url_list)
+            introspection_time = time.time() - start_time
+            
+            self.message.printMsg(
+                f"Introspection testing completed in {introspection_time:.1f} seconds.",
+                status="success"
+            )
+            
+            # Summary
+            self.message.printMsg(
+                f"Scan summary: Found {len(vulnerable_endpoints)} vulnerable GraphQL endpoints out of {len(url_list)} tested.",
+                status="success"
+            )
+            
+            return vulnerable_endpoints
 
         except Exception as e:
             self.message.printMsg(f"Error during scan: {str(e)}", status="error")
