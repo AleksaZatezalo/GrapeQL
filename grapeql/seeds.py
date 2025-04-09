@@ -1,11 +1,12 @@
 """
 Author: Aleksa Zatezalo
-Version: 2.0
-Date: March 2025
-Description: GraphQL security testing module for informational issues.
+Version: 2.1
+Date: April 2025
+Description: GraphQL security testing module for informational issues with improved reporting.
 """
 
 import asyncio
+import time
 from typing import Dict, List, Optional
 from base_tester import BaseTester
 
@@ -55,10 +56,15 @@ class seeds(BaseTester):
         except:
             pass
             
+        # Print result using new method
         if res["result"]:
             self.message.printMsg(
                 f"Low vulnerability: {res['title']}", status="warning"
             )
+        else:
+            self.message.printTestResult("Field Suggestions", vulnerable=False, 
+                details="Server does not expose field suggestions in error messages")
+            
         return res
 
     async def checkGetBasedMutation(self) -> Dict:
@@ -86,10 +92,15 @@ class seeds(BaseTester):
         except:
             pass
 
+        # Print result using new method
         if res["result"]:
             self.message.printMsg(
                 f"Medium vulnerability: {res['title']}", status="warning"
             )
+        else:
+            self.message.printTestResult("GET-based Mutations", vulnerable=False,
+                details="Server correctly blocks mutations over GET requests")
+            
         return res
 
     async def checkGetMethodSupport(self) -> Dict:
@@ -128,10 +139,15 @@ class seeds(BaseTester):
                 f"Error in GET method check: {str(e)}", status="failed"
             )
 
+        # Print result using new method
         if res["result"]:
             self.message.printMsg(
                 f"Medium vulnerability: {res['title']}", status="warning"
             )
+        else:
+            self.message.printTestResult("GET Method Support", vulnerable=False,
+                details="Server correctly restricts queries over GET requests")
+            
         return res
 
     async def checkPostBasedCsrf(self) -> Dict:
@@ -184,10 +200,15 @@ class seeds(BaseTester):
             else:
                 self.client.set_header("Content-Type", "application/json")
 
+        # Print result using new method
         if res["result"]:
             self.message.printMsg(
                 f"Medium vulnerability: {res['title']}", status="warning"
             )
+        else:
+            self.message.printTestResult("POST-based CSRF", vulnerable=False,
+                details="Server correctly validates Content-Type for POST requests")
+            
         return res
 
     async def runAllChecks(self) -> List[Dict]:
@@ -199,6 +220,7 @@ class seeds(BaseTester):
             
         self.message.printMsg("Starting basic vulnerability scanning", status="success")
 
+        start_time = time.time()
         checks = await asyncio.gather(
             self.checkFieldSuggestions(),
             self.checkGetBasedMutation(),
@@ -207,5 +229,13 @@ class seeds(BaseTester):
         )
 
         vulnerabilities = [check for check in checks if check["result"]]
+        end_time = time.time()
+        
+        # Print summary results
+        self.message.printScanSummary(
+            tests_run=len(checks),
+            vulnerabilities_found=len(vulnerabilities),
+            scan_time=end_time - start_time
+        )
 
         return vulnerabilities

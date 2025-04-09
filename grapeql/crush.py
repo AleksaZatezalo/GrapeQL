@@ -1,8 +1,8 @@
 """
-Version: 2.0
+Version: 2.1
 Author: Aleksa Zatezalo
-Date: March 2025
-Description: GraphQL DoS testing module with schema-aware query generation
+Date: April 2025
+Description: GraphQL DoS testing module with schema-aware query generation and improved reporting
 """
 
 import asyncio
@@ -20,6 +20,8 @@ class crush(BaseTester):
     def __init__(self):
         """Initialize the DoS tester with default settings."""
         super().__init__()
+        self.tests_run = 0
+        self.vulnerabilities_found = 0
 
     def printVulnerabilityDetails(
         self, vuln_type: str, is_vulnerable: bool, duration: float
@@ -33,12 +35,13 @@ class crush(BaseTester):
             self.message.printMsg(
                 f"Response time: {duration:.2f} seconds", status="failed"
             )
+            self.vulnerabilities_found += 1
         else:
-            self.message.printMsg(
-                f"Endpoint is NOT vulnerable to {vuln_type}", status="success"
-            )
-            self.message.printMsg(
-                f"Response time: {duration:.2f} seconds", status="success"
+            # Use the new printTestResult method
+            self.message.printTestResult(
+                vuln_type, 
+                vulnerable=False,
+                details=f"Response time: {duration:.2f} seconds (below threshold)"
             )
 
     def generateCircularQuery(self) -> str:
@@ -231,9 +234,11 @@ class crush(BaseTester):
 
     async def testDirectoryOverload(self) -> Tuple[bool, float]:
         """Test for directory overloading vulnerability using schema-based query."""
-
+        self.tests_run += 1
+        
         query = self.generateDirectoryOverload()
         if not query:
+            self.message.printMsg("Cannot generate Directory Overload query - insufficient schema information", status="warning")
             return False, 0.0
 
         start_time = time.time()
@@ -246,14 +251,17 @@ class crush(BaseTester):
             return is_vulnerable, duration
         except asyncio.TimeoutError:
             return True, 10.0
-        except Exception:
+        except Exception as e:
+            self.message.printMsg(f"Error testing Directory Overload: {str(e)}", status="error")
             return False, 0.0
 
     async def testCircularQuery(self) -> Tuple[bool, float]:
         """Test for circular query vulnerability using schema-based query."""
-
+        self.tests_run += 1
+        
         query = self.generateCircularQuery()
         if not query:
+            self.message.printMsg("Cannot generate Circular Query - insufficient schema information", status="warning")
             return False, 0.0
 
         start_time = time.time()
@@ -266,14 +274,17 @@ class crush(BaseTester):
             return is_vulnerable, duration
         except asyncio.TimeoutError:
             return True, 10.0
-        except Exception:
+        except Exception as e:
+            self.message.printMsg(f"Error testing Circular Query: {str(e)}", status="error")
             return False, 0.0
 
     async def testFieldDuplication(self) -> Tuple[bool, float]:
         """Test for field duplication vulnerability using schema-based query."""
-
+        self.tests_run += 1
+        
         query = self.generateFieldDuplication()
         if not query:
+            self.message.printMsg("Cannot generate Field Duplication query - insufficient schema information", status="warning")
             return False, 0.0
 
         start_time = time.time()
@@ -286,14 +297,17 @@ class crush(BaseTester):
             return is_vulnerable, duration
         except asyncio.TimeoutError:
             return True, 10.0
-        except Exception:
+        except Exception as e:
+            self.message.printMsg(f"Error testing Field Duplication: {str(e)}", status="error")
             return False, 0.0
 
     async def testArrayBatching(self) -> Tuple[bool, float]:
         """Test for array batching vulnerability using schema-based query."""
-
+        self.tests_run += 1
+        
         queries = self.generateArrayBatching()
         if not queries:
+            self.message.printMsg("Cannot generate Array Batching queries - insufficient schema information", status="warning")
             return False, 0.0
 
         start_time = time.time()
@@ -307,14 +321,14 @@ class crush(BaseTester):
             return is_vulnerable, duration
         except asyncio.TimeoutError:
             return True, 10.0
-        except Exception:
+        except Exception as e:
+            self.message.printMsg(f"Error testing Array Batching: {str(e)}", status="error")
             return False, 0.0
 
     async def testEndpointDos(self):
         """
         Test the endpoint for all DoS vulnerabilities using schema-based queries.
         """
-
         if not self.client.endpoint:
             self.message.printMsg(
                 "No endpoint set. Run set_endpoint first.",
@@ -330,6 +344,11 @@ class crush(BaseTester):
             status="warning",
         )
 
+        # Reset counters
+        self.tests_run = 0
+        self.vulnerabilities_found = 0
+        start_time = time.time()
+
         tests = [
             ("Circular Query DoS", self.testCircularQuery),
             ("Field Duplication DoS", self.testFieldDuplication),
@@ -342,3 +361,11 @@ class crush(BaseTester):
             is_vulnerable, duration = await test_func()
             self.printVulnerabilityDetails(vuln_type, is_vulnerable, duration)
             await asyncio.sleep(5)  # Reduced wait time between tests
+        
+        # Print summary
+        end_time = time.time()
+        self.message.printScanSummary(
+            tests_run=self.tests_run,
+            vulnerabilities_found=self.vulnerabilities_found,
+            scan_time=end_time - start_time
+        )

@@ -1,8 +1,9 @@
 """
 Author: Aleksa Zatezalo
-Version: 2.0
-Date: March 2025
-Description: Module to test for command injection, sql injections, and other injection attacks.
+Version: 2.1
+Date: April 2025
+Description: Module to test for command injection, sql injections, and other injection attacks
+             with improved reporting.
 """
 
 import time
@@ -19,6 +20,8 @@ class juice(BaseTester):
     def __init__(self):
         """Initialize the injection tester with default settings."""
         super().__init__()
+        self.tests_run = 0
+        self.fields_tested = 0
 
     def generateCommandInjectionPayloads(self) -> List[str]:
         """Generate command injection test payloads."""
@@ -134,6 +137,8 @@ class juice(BaseTester):
             """
 
         start_time = time.time()
+        self.tests_run += 1
+        
         try:
             result = await self.client.graphql(query, use_cache=False)
             duration = time.time() - start_time
@@ -144,8 +149,9 @@ class juice(BaseTester):
                 error_msg = result.get("errors", [{}])[0].get(
                     "message", "Unknown error"
                 )
-                self.message.printMsg(f"Query: {query}", status="error")
-                self.message.printMsg(f"Query error: {error_msg}", status="error")
+                if self.debug_mode:  # Only print if debug mode is enabled
+                    self.message.printMsg(f"Query: {query}", status="error")
+                    self.message.printMsg(f"Query error: {error_msg}", status="error")
 
             # Check for command output indicators
             indicators = [
@@ -187,50 +193,89 @@ class juice(BaseTester):
             )
             return []
 
-        print()
         self.message.printMsg("Starting command injection testing", status="success")
         self.message.printMsg(
             "This may take some time depending on the number of fields...",
             status="warning",
         )
 
+        self.tests_run = 0
+        self.fields_tested = 0
         vulnerabilities = []
         payloads = self.generateCommandInjectionPayloads()
+        start_time = time.time()
 
         # Test query fields
         for field_name, field_info in self.schema_manager.query_fields.items():
             for arg in field_info.get("args", []):
                 arg_type_name = self.schema_manager.get_field_type_name(arg.get("type", {}))
                 if arg_type_name in ["String", "ID"]:
+                    self.fields_tested += 1
                     self.message.printMsg(
                         f"Testing query field: {field_name}.{arg['name']}",
                         status="log",
                     )
 
+                    field_vulnerable = False
                     for payload in payloads:
                         is_vulnerable, message, duration = await self.testForCommandInjection(
                             field_name, arg["name"], payload
                         )
                         if is_vulnerable:
+                            field_vulnerable = True
                             vulnerabilities.append(message)
                             self.message.printMsg(message, status="failed")
+                    
+                    # Print test result if field is not vulnerable
+                    if not field_vulnerable:
+                        self.message.printTestResult(
+                            f"Injection Test: {field_name}.{arg['name']}", 
+                            vulnerable=False,
+                            details="Field is properly sanitized against command injection"
+                        )
 
         # Test mutation fields
         for field_name, field_info in self.schema_manager.mutation_fields.items():
             for arg in field_info.get("args", []):
                 arg_type_name = self.schema_manager.get_field_type_name(arg.get("type", {}))
                 if arg_type_name in ["String", "ID"]:
+                    self.fields_tested += 1
                     self.message.printMsg(
                         f"Testing mutation field: {field_name}.{arg['name']}",
                         status="log",
                     )
 
+                    field_vulnerable = False
                     for payload in payloads:
                         is_vulnerable, message, duration = await self.testForCommandInjection(
                             field_name, arg["name"], payload, is_mutation=True
                         )
                         if is_vulnerable:
+                            field_vulnerable = True
                             vulnerabilities.append(message)
                             self.message.printMsg(message, status="failed")
+                    
+                    # Print test result if field is not vulnerable
+                    if not field_vulnerable:
+                        self.message.printTestResult(
+                            f"Injection Test: {field_name}.{arg['name']} (mutation)", 
+                            vulnerable=False,
+                            details="Field is properly sanitized against command injection"
+                        )
+        
+        scan_time = time.time() - start_time
+        
+        # Print summary
+        self.message.printScanSummary(
+            tests_run=self.tests_run,
+            vulnerabilities_found=len(vulnerabilities),
+            scan_time=scan_time
+        )
+        
+        if self.fields_tested == 0:
+            self.message.printMsg(
+                "No fields with string inputs found to test for injection", 
+                status="info"
+            )
 
         return vulnerabilities

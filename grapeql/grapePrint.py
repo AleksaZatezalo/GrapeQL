@@ -1,12 +1,11 @@
 """
 Author: Aleksa Zatezalo
-Version: 1.0
-Date: October 2024
-Description: ASCII Art and 'graphics' for GrapeQL. 
+Version: 1.1
+Date: April 2025
+Description: ASCII Art and 'graphics' for GrapeQL with improved test result reporting.
 """
 
 import time
-
 
 class grapePrint:
     """
@@ -83,11 +82,15 @@ class grapePrint:
                    - "warning" (yellow with [!])
                    - "failed" (red with [-])
                    - "log" (cyan with [!], default)
+                   - "info" (blue with [i])
+                   - "passed" (green with [✓])
         """
 
         plus = "\n[+] "
         exclaim = "[!] "
         fail = "[-] "
+        info = "[i] "
+        passed = "[✓] "
 
         match status:
             case "success":
@@ -98,6 +101,51 @@ class grapePrint:
                 print(self.RED + fail + message + self.END)
             case "log":
                 print(self.CYAN + exclaim + message + self.END)
+            case "info":
+                print(self.BLUE + info + message + self.END)
+            case "passed":
+                print(self.GREEN + passed + message + self.END)
+
+    def printTestResult(self, test_name: str, vulnerable: bool = False, details: str = None):
+        """
+        Print the result of a specific test.
+        
+        Args:
+            test_name: Name of the test that was performed
+            vulnerable: Whether a vulnerability was found
+            details: Optional details about the test result
+        """
+        if vulnerable:
+            self.printMsg(f"Test '{test_name}' found vulnerabilities", status="failed")
+            if details:
+                self.printMsg(f"Details: {details}", status="warning")
+        else:
+            self.printMsg(f"Test '{test_name}' passed - no vulnerabilities found", status="passed")
+            if details:
+                self.printMsg(f"Details: {details}", status="info")
+    
+    def printScanSummary(self, tests_run: int, vulnerabilities_found: int, scan_time: float = None):
+        """
+        Print a summary of a scan.
+        
+        Args:
+            tests_run: Number of tests run
+            vulnerabilities_found: Number of vulnerabilities found
+            scan_time: Optional scan duration in seconds
+        """
+        if vulnerabilities_found > 0:
+            self.printMsg(
+                f"Scan complete: Found {vulnerabilities_found} vulnerabilities across {tests_run} tests", 
+                status="warning" if vulnerabilities_found > 0 else "success"
+            )
+        else:
+            self.printMsg(
+                f"Scan complete: No vulnerabilities found across {tests_run} tests", 
+                status="passed"
+            )
+            
+        if scan_time is not None:
+            self.printMsg(f"Scan duration: {scan_time:.2f} seconds", status="info")
 
     def printNotify(self):
         """
@@ -109,6 +157,8 @@ class grapePrint:
         - Error messages (red)
         - Success messages (green)
         - Log messages (cyan)
+        - Info messages (blue)
+        - Passed test messages (green)
         """
 
         time.sleep(0.25)
@@ -121,6 +171,12 @@ class grapePrint:
         self.printMsg("Errors are printed like this.", status="failed")
         time.sleep(0.5)
         self.printMsg("Logs are printed like this.", status="log")
+        time.sleep(0.5)
+        self.printMsg("Informational messages are printed like this.", status="info")
+        time.sleep(0.5)
+        self.printMsg("Passed tests are printed like this.", status="passed")
+        time.sleep(0.5)
+        self.printTestResult("Example Test", vulnerable=False)
         time.sleep(0.5)
 
     def intro(self):
