@@ -208,26 +208,3 @@ class base:
             f"Set credentials to {username}:{password} for command injection testing",
             status="success",
         )
-
-    def genPayloads():
-        """
-        """
-        
-        pass
-
-    def formatRequest():
-        """
-        """
-
-        pass
-
-    def executeTests():
-        """
-        """
-
-        pass
-
-    def writeToFile():
-        """
-        ""
-        pass
