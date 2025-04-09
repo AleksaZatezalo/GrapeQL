@@ -9,8 +9,8 @@ Port scanning is performed directly while directory busting and introspection ar
 import asyncio
 import aiohttp
 from typing import Dict, List, Optional
-from .grapePrint import grapePrint
-from .headers_manager import HeadersManager
+from grapePrint import grapePrint
+from headers_manager import HeadersManager
 import time
 import socket
 

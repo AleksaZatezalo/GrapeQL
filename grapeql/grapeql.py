@@ -9,12 +9,12 @@ import asyncio
 import argparse
 import time
 import json
-from .vine import vine
-from .root import root
-from .crush import crush
-from .seeds import seeds
-from .juice import juice
-from .grapePrint import grapePrint
+from vine import vine
+from root import root
+from crush import crush
+from seeds import seeds
+from juice import juice
+from grapePrint import grapePrint
 
 
 def loadWordlist(wordlist_path):

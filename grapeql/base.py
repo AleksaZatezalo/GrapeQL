@@ -7,8 +7,8 @@ Description: Module for session managment and request generation.
 
 import aiohttp
 from typing import Dict, List, Optional, Tuple
-from .grapePrint import grapePrint
-from .headers_manager import HeadersManager
+from grapePrint import grapePrint
+from headers_manager import HeadersManager
 import json
 import time
 
