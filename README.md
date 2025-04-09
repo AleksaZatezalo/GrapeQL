@@ -1,171 +1,77 @@
-# 🍇 GrapeQL: The GraphQL Security Testing Suite
+# GrapeQL - GraphQL Security Testing Tool
 
-Version: 1.0
-Last Updated: March 2025
-
-## Overview
-
-GrapeQL is a comprehensive GraphQL security assessment toolkit designed to help security researchers and developers identify vulnerabilities in GraphQL implementations. Named after the fruit that grows in clusters, GrapeQL tests multiple security aspects of your GraphQL endpoint in parallel, providing thorough coverage of potential security issues.
-
-```ascii
-   .     .  🍇  .      .
-.  .  🍇  .  🍇   .    
-  🍇   GrapeQL   🍇  .  
-. 🍇  Security  🍇 .   
-   .  🍇  .  🍇  .     
-      .    .    .      
-```
-
-Let me analyze the code and rewrite the Features section to accurately reflect the implemented classes.
-
-## GrapeQL Usage Guide
-
-GrapeQL is a GraphQL security testing tool that can identify and test for various denial of service (DoS) vulnerabilities in GraphQL endpoints.
-
-### Installation
-
-```
-pipx install git+https://github.com/AleksaZatezalo/GrapeQL.git
-```
-
-### Basic Usage
-
-```bash
-grapeql [-h] (-t TARGET | --api API) [-p PROXY] [-c] [-w WORDLIST]
-```
-
-#### Required Arguments
-
-- `-t TARGET, --target TARGET`
-  - Target IP address to scan
-  - Example: `grapeql -t 192.168.1.100`
-
-- `--api API`
-  - Direct URL to test for GraphQL introspection
-  - Bypasses port scanning and directory busting
-  - Example: `grapeql --api http://example.com/graphql`
-
-### Optional Arguments
-
-- `-p PROXY, --proxy PROXY`
-  - Optional proxy address in format host:port
-  - Useful for intercepting traffic with tools like Burp Suite
-  - Example: `grapeql -t 192.168.1.100 -p 127.0.0.1:8080`
-
-- `-c, --crush`
-  - Use enhanced crush DoS testing instead of standard root testing
-  - Includes additional test vectors like directory overloading
-  - Example: `grapeql --api http://example.com/graphql -c`
-
-- `-w WORDLIST, --wordlist WORDLIST`
-  - Path to custom wordlist file for endpoint discovery
-  - Example: `grapeql -t 192.168.1.100 -w custom_paths.txt`
-
-- `-u USERNAME`
-  - Name passed to the variable username in GraphQL queries
-
-- `-pw PASSWORD`
-  - Password passed to the variable password in GraphQL queries
-
-
-## Example Usage Scenarios
-
-1.Basic scan of an IP address:
-
-```bash
-grapeql -t 192.168.1.100
-```
-
-2.Direct testing of a known GraphQL endpoint with enhanced DoS testing:
-
-```bash
-grapeql --api http://example.com/graphql --crush
-```
-
-3.Testing through Burp Suite proxy with custom wordlist:
-
-```bash
-grapeql -t 192.168.1.100 -p 127.0.0.1:8080 -w wordlist.txt
-```
-
-4.Full scan with all options:
-
-```bash
-grapeql -t 192.168.1.100 -p 127.0.0.1:8080 -w wordlist.txt -crush -u admin -pw changeme
-```
-
-## Notes
-
-- When using the proxy option, ensure your proxy tool (e.g., Burp Suite) is properly configured
-- The crush testing mode (-c) includes more aggressive tests that might impact application performance
-- Custom wordlists should contain one path per line
-- All HTTPS connections through proxy are made with SSL verification disabled
-
-## Warning
-
-This tool is intended for security testing with proper authorization. Unauthorized testing against systems you don't own or have permission to test may be illegal.
+GrapeQL is a comprehensive GraphQL security testing tool designed to identify vulnerabilities in GraphQL endpoints. The tool combines port scanning, directory enumeration, GraphQL schema analysis, and various security tests to provide a complete security assessment of GraphQL implementations.
 
 ## Features
 
-### 1. The Vine: Endpoint Discovery and Enumeration
+- **Endpoint Discovery**: Port scanning and directory busting to find GraphQL endpoints
+- **Server Fingerprinting**: Identify the GraphQL server implementation (Apollo, Hasura, etc.)
+- **Schema Analysis**: Extract and analyze schema information through introspection
+- **Vulnerability Testing**:
+  - Introspection vulnerability detection
+  - Cross-Site Request Forgery (CSRF) vulnerability testing
+  - Command injection testing
+  - Denial of Service (DoS) attack simulation
+- **Reporting**: Generate comprehensive reports in Markdown or JSON format
 
-- Automated port scanning with direct connection capabilities
-- Concurrent directory busting for GraphQL endpoints
-- Configurable endpoint path enumeration
-- Built-in common GraphQL endpoint path detection
-- Proxy support for HTTP operations through Burp Suite
-- Introspection query testing to identify vulnerable endpoints
-- Custom endpoint list configuration
+## Architecture
 
-### 2. Root Analysis: GraphQL Engine Detection
+The codebase follows a modular architecture with several key components:
 
-- Comprehensive GraphQL server implementation fingerprinting
-- Support for detecting 25+ GraphQL engines including:
-  - Apollo Server
-  - GraphQL Yoga
-  - AWS AppSync
-  - Hasura
-  - GraphQL PHP
-  - Ruby GraphQL
-  - And many more
-- Detailed error message analysis
-- Custom query generation for engine identification
-- Proxy-aware implementation testing
+### Core Components
 
-### 3. Seeds: CSRF and Method Testing
+- **GraphQLClient**: Unified HTTP client for all GraphQL requests
+- **SchemaManager**: Central schema parsing and management
+- **BaseTester**: Common base class for all testing modules
 
-- Field suggestion vulnerability detection
-- GET-based mutation testing for CSRF vulnerabilities
-- Query method support analysis
-- POST-based CSRF testing with different content types
-- Detailed vulnerability reporting including:
-- Severity classification
-- Impact assessment
-- Verification commands (curl)
-- Vulnerability descriptions
+### Testing Modules
 
-### 4. Juice: Command Injection Testing
+- **vine**: Endpoint discovery through port scanning and directory busting
+- **root**: GraphQL server fingerprinting
+- **seeds**: Basic security vulnerability checks
+- **juice**: Command and SQL injection testing
+- **crush**: Denial of Service testing
 
-- Schema-aware query generation for targeted testing
-- Authenticated command injection testing
+## Setup
 
-### 5. Crush: DoS Vulnerability Testing
+```bash
+# Clone the repository
+git clone https://github.com/username/grapeql.git
+cd grapeql
 
-- Schema-aware query generation for targeted testing
-- Circular query vulnerability detection
-- Field duplication attack testing
-- Array batching vulnerability assessment
-- Response time analysis for DoS detection
-- Detailed vulnerability reporting
-- Proxy support for request routing
-- Introspection-based query customization
-- Configurable test parameters
+# Install the package
+pip install -e .
+```
 
-Each module is designed to work independently or as part of the complete suite, with built-in proxy support for integration with security testing tools like Burp Suite. The tools use asynchronous operations for efficient testing and provide detailed output through a custom printing system.
+## Usage
 
-## Why GrapeQL?
+```bash
+# Basic usage with direct API endpoint
+grapeql --api https://example.com/graphql
 
-Like a bunch of grapes, GraphQL endpoints have many interconnected parts that need to be tested thoroughly. GrapeQL tests each "grape" (component) while understanding how they connect to form the whole cluster (API). Our tool is designed to be sweet and simple to use, while providing comprehensive coverage.
+# Full scan with port scanning and directory busting
+grapeql -t 192.168.1.1
+
+# With proxy (useful for Burp Suite integration)
+grapeql --api https://example.com/graphql -p 127.0.0.1:8080
+
+# Custom headers and authentication
+grapeql --api https://example.com/graphql --header "User-Agent:Mozilla/5.0" --auth "your-token"
+
+# Generate a report
+grapeql --api https://example.com/graphql --report vulnerability-report.md
+
+# Run DoS testing (use with caution)
+grapeql --api https://example.com/graphql -c
+```
+
+## Contribution
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Donation Link
 
