@@ -8,7 +8,7 @@ Description: Module to test for command injection, sql injections, and other inj
 import time
 import json
 from typing import Dict, List, Optional, Tuple
-from .base_tester import BaseTester
+from base_tester import BaseTester
 
 
 class juice(BaseTester):

@@ -7,9 +7,9 @@ Description: Base class for GraphQL security testers
 
 import asyncio
 from typing import Dict, List, Optional, Any, Tuple
-from .grapePrint import grapePrint
-from .http_client import GraphQLClient
-from .schema_manager import SchemaManager
+from grapePrint import grapePrint
+from http_client import GraphQLClient
+from schema_manager import SchemaManager
 
 class BaseTester:
     """

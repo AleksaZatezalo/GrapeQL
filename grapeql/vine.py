@@ -9,8 +9,8 @@ import asyncio
 import aiohttp
 import socket
 from typing import Dict, List, Optional, Set
-from .grapePrint import grapePrint
-from .http_client import GraphQLClient
+from grapePrint import grapePrint
+from http_client import GraphQLClient
 import time
 
 

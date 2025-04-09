@@ -8,7 +8,7 @@ Description: GraphQL DoS testing module with schema-aware query generation
 import asyncio
 import time
 from typing import Dict, List, Optional, Tuple
-from .base_tester import BaseTester
+from base_tester import BaseTester
 
 
 class crush(BaseTester):

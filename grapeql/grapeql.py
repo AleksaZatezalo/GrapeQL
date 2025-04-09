@@ -11,14 +11,14 @@ import time
 import json
 from typing import Dict, List, Optional, Any
 
-from .vine import vine
-from .root import root
-from .crush import crush
-from .seeds import seeds
-from .juice import juice
-from .grapePrint import grapePrint
-from .http_client import GraphQLClient
-from .schema_manager import SchemaManager
+from vine import vine
+from root import root
+from crush import crush
+from seeds import seeds
+from juice import juice
+from grapePrint import grapePrint
+from http_client import GraphQLClient
+from schema_manager import SchemaManager
 
 
 def loadWordlist(wordlist_path):

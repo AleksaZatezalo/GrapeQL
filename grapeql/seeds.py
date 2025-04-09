@@ -7,7 +7,7 @@ Description: GraphQL security testing module for informational issues.
 
 import asyncio
 from typing import Dict, List, Optional
-from .base_tester import BaseTester
+from base_tester import BaseTester
 
 
 class seeds(BaseTester):
