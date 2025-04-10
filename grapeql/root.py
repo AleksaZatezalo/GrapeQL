@@ -7,7 +7,7 @@ Description: GraphQL fingerprinting module with improved reporting
 
 import time
 from typing import Dict, List, Optional, Tuple
-from base_tester import BaseTester
+from .base_tester import BaseTester
 
 
 class EngineInfo:

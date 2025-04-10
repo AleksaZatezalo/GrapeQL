@@ -11,15 +11,14 @@ import time
 import json
 from typing import Dict, List, Optional, Any
 
-from vine import vine
-from root import root
-from crush import crush
-from seeds import seeds
-from juice import juice
-from grapePrint import grapePrint
-from http_client import GraphQLClient
-from schema_manager import SchemaManager
-from report import generate_report  # Fixed import - direct import
+from .vine import vine
+from .root import root
+from .crush import crush
+from .seeds import seeds
+from .juice import juice
+from .grapePrint import grapePrint
+from .http_client import GraphQLClient
+from .schema_manager import SchemaManager
 
 
 def loadWordlist(wordlist_path):
@@ -455,7 +454,7 @@ async def main():
         
         # Generate report if requested
         if args.report and all_vulnerabilities:
-            # Fixed direct call to generate_report without relative import
+            from .report import generate_report
             generate_report(args.report, all_vulnerabilities)
             message.printMsg(f"Report generated: {args.report}", status="success")
 

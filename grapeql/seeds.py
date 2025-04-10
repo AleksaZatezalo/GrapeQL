@@ -8,8 +8,7 @@ Description: GraphQL security testing module for informational issues with impro
 import asyncio
 import time
 from typing import Dict, List, Optional
-from base_tester import BaseTester
-
+from .base_tester import BaseTester
 
 class seeds(BaseTester):
     """

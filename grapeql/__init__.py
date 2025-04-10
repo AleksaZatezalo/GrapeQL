@@ -5,16 +5,16 @@ Author: Aleksa Zatezalo
 Version: 2.0.0
 """
 
-from vine import vine
-from root import root
-from crush import crush
-from seeds import seeds
-from juice import juice
-from grapePrint import grapePrint
-from http_client import GraphQLClient
-from schema_manager import SchemaManager
-from base_tester import BaseTester
-from report import generate_report
+from grapeql.vine import vine
+from grapeql.root import root
+from grapeql.crush import crush
+from grapeql.seeds import seeds
+from grapeql.juice import juice
+from grapeql.grapePrint import grapePrint
+from grapeql.http_client import GraphQLClient
+from grapeql.schema_manager import SchemaManager
+from grapeql.base_tester import BaseTester
+from grapeql.report import generate_report
 
 __version__ = '2.0.0'
 __all__ = [
@@ -31,4 +31,4 @@ __all__ = [
 ]
 
 # Export main function for CLI usage
-from .grapeql import run_cli
+from grapeql.grapeql import run_cli

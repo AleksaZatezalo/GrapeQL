@@ -8,7 +8,7 @@ Description: Unified HTTP client for GraphQL requests with proper session handli
 import aiohttp
 import asyncio
 from typing import Dict, List, Optional, Any, Tuple, Union
-from headers_manager import HeadersManager
+from grapeql.headers_manager import HeadersManager
 import json
 import time
 import functools

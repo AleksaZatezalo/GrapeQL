@@ -6,7 +6,7 @@ Description: GraphQL schema management for testing tools
 """
 
 from typing import Dict, List, Optional, Any, Set, Tuple
-from http_client import GraphQLClient
+from grapeql.http_client import GraphQLClient
 
 class SchemaManager:
     """
