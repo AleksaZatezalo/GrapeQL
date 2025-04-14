@@ -76,7 +76,7 @@ class BaseTester:
         """
         self.client.set_cookies(cookies)
         
-    def set_authorization(self, token: str, prefix: str = "Bearer") -> None:
+    def set_authorization(self, token: str) -> None:
         """
         Set Authorization header with token.
         
@@ -84,7 +84,7 @@ class BaseTester:
             token: Authorization token
             prefix: Token type prefix (default: "Bearer")
         """
-        self.client.set_authorization(token, prefix)
+        self.client.set_authorization(token)
         self.auth_token = token
         self.message.printMsg(f"Set authorization token with prefix '{prefix}'", status="success")
         
