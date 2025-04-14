@@ -1,34 +1,26 @@
 """
-GrapeQL - A GraphQL Security Testing Tool
+GrapeQL - A GraphQL Security Testing Tool (Simplified Version)
 
 Author: Aleksa Zatezalo
-Version: 2.0.0
+Version: 3.0.0
 """
 
-from grapeql.vine import vine
-from grapeql.root import root
-from grapeql.crush import crush
-from grapeql.seeds import seeds
-from grapeql.juice import juice
-from grapeql.grapePrint import grapePrint
-from grapeql.http_client import GraphQLClient
-from grapeql.schema_manager import SchemaManager
-from grapeql.base_tester import BaseTester
-from grapeql.report import generate_report
+from .grapePrint import grapePrint
+from .http_client import GraphQLHTTPClient
+from .scanner import GraphQLScanner
+from .schema_analyzer import SchemaAnalyzer
+from .test_modules import SecurityTester
+from .report import generate_report
 
-__version__ = '2.0.0'
+__version__ = '3.0.0'
 __all__ = [
-    'vine', 
-    'root', 
-    'crush', 
-    'seeds', 
-    'juice', 
     'grapePrint',
-    'GraphQLClient',
-    'SchemaManager',
-    'BaseTester',
+    'GraphQLHTTPClient',
+    'GraphQLScanner',
+    'SchemaAnalyzer',
+    'SecurityTester',
     'generate_report'
 ]
 
 # Export main function for CLI usage
-from grapeql.grapeql import run_cli
+from .grapeql import run_cli
