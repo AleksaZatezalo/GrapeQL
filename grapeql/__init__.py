@@ -8,7 +8,6 @@ Date: April 2025
 
 from .utils import GrapePrinter, Finding
 from .client import GraphQLClient
-from .scanner import Scanner
 from .fingerprint import Fingerprinter
 from .tester import VulnerabilityTester
 from .injection_tester import InjectionTester
@@ -22,7 +21,6 @@ __all__ = [
     'GrapePrinter',
     'Finding',
     'GraphQLClient',
-    'Scanner',
     'Fingerprinter',
     'VulnerabilityTester',
     'InjectionTester',

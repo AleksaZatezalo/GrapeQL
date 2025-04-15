@@ -13,7 +13,6 @@ from typing import Dict, List, Optional
 
 from .utils import GrapePrinter
 from .client import GraphQLClient
-from .scanner import Scanner
 from .fingerprint import Fingerprinter
 from .injection_tester import InjectionTester
 from .dos_tester import DosTester
