@@ -60,12 +60,10 @@ grapeql --help
 
 ```python
 import asyncio
-from grapeql import Scanner, InfoTester, InjectionTester, Reporter
+from grapeql import InfoTester, InjectionTester, Reporter
 
 async def main():
-    # Initialize scanner
-    scanner = Scanner()
-    
+
     # Find GraphQL endpoints
     endpoints = await scanner.scan_url("https://example.com/graphql")
     
