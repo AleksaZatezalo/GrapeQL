@@ -56,38 +56,6 @@ For full usage options:
 grapeql --help
 ```
 
-### Using as a Library
-
-```python
-import asyncio
-from grapeql import InfoTester, InjectionTester, Reporter
-
-async def main():
-
-    # Find GraphQL endpoints
-    endpoints = await scanner.scan_url("https://example.com/graphql")
-    
-    # Run information disclosure tests
-    info_tester = InfoTester()
-    await info_tester.setup_endpoint(endpoints[0])
-    await info_tester.run_test()
-    
-    # Run injection tests
-    injection_tester = InjectionTester()
-    await injection_tester.setup_endpoint(endpoints[0])
-    await injection_tester.run_test()
-    
-    # Generate report
-    reporter = Reporter()
-    reporter.set_target("https://example.com/graphql")
-    reporter.add_findings(info_tester.get_findings())
-    reporter.add_findings(injection_tester.get_findings())
-    reporter.generate_report("markdown", "report.md")
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
 ## Test Modules
 
 GrapeQL includes several test modules:
