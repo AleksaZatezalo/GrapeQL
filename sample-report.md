@@ -1,7 +1,7 @@
 # GrapeQL Security Assessment Report
 
 ## Target: http://127.0.0.1:5013/graphql
-## Date: 2025-04-16 00:22:20
+## Date: 2025-04-16 01:08:35
 
 ## Executive Summary
 
@@ -41,7 +41,7 @@ Total: 16 findings
 
 **Endpoint:** http://127.0.0.1:5013/graphql
 
-**Description:** The GraphQL endpoint is vulnerable to denial of service through circular query dos. Response time: 10.89 seconds.
+**Description:** The GraphQL endpoint is vulnerable to denial of service through circular query dos. Response time: 10.88 seconds.
 
 **Impact:** Server resources can be exhausted, potentially causing service outages
 
@@ -55,7 +55,7 @@ Total: 16 findings
 
 **Endpoint:** http://127.0.0.1:5013/graphql
 
-**Description:** The GraphQL endpoint is vulnerable to denial of service through circular query dos. Response time: 10.89 seconds.
+**Description:** The GraphQL endpoint is vulnerable to denial of service through circular query dos. Response time: 10.88 seconds.
 
 **Impact:** Server resources can be exhausted, potentially causing service outages
 
@@ -69,7 +69,7 @@ Total: 16 findings
 
 **Endpoint:** http://127.0.0.1:5013/graphql
 
-**Description:** The GraphQL endpoint is vulnerable to denial of service through field duplication dos. Response time: 10.98 seconds.
+**Description:** The GraphQL endpoint is vulnerable to denial of service through field duplication dos. Response time: 10.99 seconds.
 
 **Impact:** Server resources can be exhausted, potentially causing service outages
 
@@ -83,7 +83,7 @@ Total: 16 findings
 
 **Endpoint:** http://127.0.0.1:5013/graphql
 
-**Description:** The GraphQL endpoint is vulnerable to denial of service through field duplication dos. Response time: 10.98 seconds.
+**Description:** The GraphQL endpoint is vulnerable to denial of service through field duplication dos. Response time: 10.99 seconds.
 
 **Impact:** Server resources can be exhausted, potentially causing service outages
 
