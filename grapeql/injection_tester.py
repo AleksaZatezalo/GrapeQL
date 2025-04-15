@@ -23,6 +23,20 @@ class InjectionTester(VulnerabilityTester):
         self.test_name = "GraphQL Command Injection Testing"
         self.username = "admin"
         self.password = "changeme"
+        self.credentials_set = False
+        
+    def set_credentials(self, username: str, password: str) -> None:
+        """
+        Set credentials for use in testing authentication-related issues.
+        
+        Args:
+            username: Username for testing
+            password: Password for testing
+        """
+        self.username = username
+        self.password = password
+        self.credentials_set = True
+        self.printer.print_msg(f"Set credentials: {username}:{password}", status="success")
         
     def generate_command_injection_payloads(self) -> List[str]:
         """
@@ -100,10 +114,23 @@ class InjectionTester(VulnerabilityTester):
             
         # Build arguments string including all required fields
         arg_strings = []
+        has_username_field = False
+        has_password_field = False
+        
+        # First pass to check if username or password fields exist
+        for arg in field_info["args"]:
+            if arg["name"] == "username":
+                has_username_field = True
+            elif arg["name"] == "password":
+                has_password_field = True
+                
+        # Second pass to build argument strings
         for arg in field_info["args"]:
             if arg["name"] == arg_name:
+                # This is the argument we're testing - use the payload
                 arg_strings.append(f'{arg["name"]}: "{payload}"')
-            if arg["name"] != arg_name:
+            else:
+                # For other arguments, provide appropriate values
                 if arg["name"] == "username":
                     arg_strings.append(f'{arg["name"]}: "{self.username}"')
                 elif arg["name"] == "password":
@@ -114,6 +141,16 @@ class InjectionTester(VulnerabilityTester):
                     arg_strings.append(f'{arg["name"]}: true')
                 else:
                     arg_strings.append(f'{arg["name"]}: "test"')
+                    
+        # If credentials are set and username/password fields exist but are not
+        # in the schema args, add them anyway to ensure authentication
+        if self.credentials_set:
+            # Only add these if they're not already covered by the schema args
+            if not has_username_field and not arg_name == "username":
+                arg_strings.append(f'username: "{self.username}"')
+            if not has_password_field and not arg_name == "password":
+                arg_strings.append(f'password: "{self.password}"')
+                
         args_str = ", ".join(arg_strings)
         
         # Define common field selections for different types
@@ -260,6 +297,13 @@ class InjectionTester(VulnerabilityTester):
             "This may take some time depending on the number of fields...",
             status="warning"
         )
+        
+        # If credentials are set, log that they will be used
+        if self.credentials_set:
+            self.printer.print_msg(
+                f"Using credentials: {self.username}:{self.password} for all applicable tests",
+                status="log"
+            )
         
         # Test query fields first
         for field_name in self.client.query_fields:

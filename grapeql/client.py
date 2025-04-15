@@ -253,7 +253,6 @@ class GraphQLClient:
                 
             if error_msgs:
                 error_str = "; ".join(error_msgs)
-                self.printer.print_msg(f"GraphQL errors: {error_str}", status="error")
                 # Don't return error as response might still contain partial data
         
         return response, None
