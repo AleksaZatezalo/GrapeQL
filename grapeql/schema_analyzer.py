@@ -28,6 +28,11 @@ class SchemaAnalyzer:
         self.query_fields = {}
         self.mutation_fields = {}
         self.subscription_fields = {}
+        self.debug_mode = False
+    
+    def set_debug_mode(self, debug_mode: bool = True) -> None:
+        """Enable or disable debug mode."""
+        self.debug_mode = debug_mode
     
     async def load_schema(self) -> bool:
         """
@@ -230,7 +235,7 @@ class SchemaAnalyzer:
             nested_query = "id\nname"
             
             # Add circular nesting
-            for _ in range(5):  # 5 levels of nesting
+            for _ in range(20):  # Increased nesting levels for better DoS testing
                 nested_query = f"""
                 {source_field} {{
                     id
@@ -259,37 +264,41 @@ class SchemaAnalyzer:
     
     def get_injectable_fields(self) -> Dict[str, List[Dict]]:
         """
-        Get fields that might be vulnerable to injection attacks.
+        Get all fields with arguments for injection testing.
         
         Returns:
-            Dict[str, List[Dict]]: Dictionary mapping operation types to injectable fields
+            Dict[str, List[Dict]]: Dictionary mapping operation types to fields with arguments
         """
         injectable = {
             "query": [],
             "mutation": []
         }
         
-        # Check query fields
+        # Check all query fields with arguments
         for field_name, field_info in self.query_fields.items():
             for arg in field_info.get("args", []):
+                arg_name = arg.get("name", "")
                 arg_type = self.get_type_name(arg.get("type", {}))
-                if arg_type in ("String", "ID"):
-                    injectable["query"].append({
-                        "field": field_name,
-                        "arg": arg["name"],
-                        "type": arg_type
-                    })
+                
+                # Include all fields with arguments, not just String or ID types
+                injectable["query"].append({
+                    "field": field_name,
+                    "arg": arg_name,
+                    "type": arg_type
+                })
         
-        # Check mutation fields
+        # Check all mutation fields with arguments
         for field_name, field_info in self.mutation_fields.items():
             for arg in field_info.get("args", []):
+                arg_name = arg.get("name", "")
                 arg_type = self.get_type_name(arg.get("type", {}))
-                if arg_type in ("String", "ID"):
-                    injectable["mutation"].append({
-                        "field": field_name,
-                        "arg": arg["name"],
-                        "type": arg_type
-                    })
+                
+                # Include all fields with arguments, not just String or ID types
+                injectable["mutation"].append({
+                    "field": field_name,
+                    "arg": arg_name,
+                    "type": arg_type
+                })
         
         return injectable
     

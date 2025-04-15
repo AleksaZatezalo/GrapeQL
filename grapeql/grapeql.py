@@ -19,7 +19,7 @@ from .test_modules import SecurityTester
 async def run_security_tests(endpoint: str, proxy: Optional[str] = None, 
                             headers: Optional[Dict] = None, cookies: Optional[Dict] = None,
                             username: Optional[str] = None, password: Optional[str] = None,
-                            dos_testing: bool = False) -> Dict:
+                            dos_testing: bool = False, debug_mode: bool = False) -> Dict:
     """
     Run all security tests for an endpoint.
     
@@ -31,6 +31,7 @@ async def run_security_tests(endpoint: str, proxy: Optional[str] = None,
         username: Optional username for injection testing
         password: Optional password for injection testing
         dos_testing: Whether to run DoS tests
+        debug_mode: Whether to enable debug mode
         
     Returns:
         dict: Results of security tests
@@ -38,30 +39,45 @@ async def run_security_tests(endpoint: str, proxy: Optional[str] = None,
     message = grapePrint()
     scanner = GraphQLScanner()
     
-    # Set authentication credentials if provided
-    if username and password:
-        scanner.set_credentials(username, password)
-    
-    # Set custom headers and cookies if provided
-    if headers:
-        scanner.set_headers(headers)
-    if cookies:
-        scanner.set_cookies(cookies)
-    
-    # Set the endpoint
-    if not await scanner.set_endpoint(endpoint, proxy):
-        message.printMsg(f"Failed to connect to endpoint: {endpoint}", status="failed")
-        return {"status": "failed", "error": "Could not connect to endpoint"}
-    
-    # Run security tests
-    message.printMsg("Starting security tests...", status="log")
-    tester = SecurityTester(scanner)
-    results = await tester.run_all_tests(run_dos=dos_testing)
-    
-    # Clean up resources
-    await scanner.close()
-    
-    return results
+    try:
+        # Set debug mode if enabled
+        if debug_mode:
+            scanner.set_debug_mode(True)
+            message.printMsg("Debug mode enabled", status="info")
+        
+        # Set authentication credentials if provided
+        if username and password:
+            scanner.set_credentials(username, password)
+            message.printMsg(f"Using provided credentials for authentication testing", status="info")
+        
+        # Set custom headers and cookies if provided
+        if headers:
+            scanner.set_headers(headers)
+        if cookies:
+            scanner.set_cookies(cookies)
+        
+        # Configure proxy if provided
+        if proxy:
+            message.printMsg(f"Using proxy: {proxy} for all security tests", status="info")
+            if not scanner.client.set_proxy_from_string(proxy):
+                message.printMsg(f"Invalid proxy format: {proxy}", status="failed")
+                return {"status": "failed", "error": f"Invalid proxy format: {proxy}"}
+        
+        # Set the endpoint
+        if not await scanner.set_endpoint(endpoint):
+            message.printMsg(f"Failed to connect to endpoint: {endpoint}", status="failed")
+            return {"status": "failed", "error": "Could not connect to endpoint"}
+        
+        # Run security tests
+        message.printMsg("Starting security tests...", status="log")
+        # Pass the proxy to SecurityTester to ensure all tests use it
+        tester = SecurityTester(scanner, proxy=proxy)
+        results = await tester.run_all_tests(run_dos=dos_testing)
+        
+        return results
+    finally:
+        # Always clean up resources
+        await scanner.close()
 
 
 def load_json_file(file_path: str) -> Optional[Dict]:
@@ -122,6 +138,13 @@ async def main():
         default="changeme"
     )
     
+    # Debug mode
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug mode with verbose output"
+    )
+    
     # Headers and cookies
     parser.add_argument(
         "--header",
@@ -162,6 +185,8 @@ async def main():
     # Parse arguments
     args = parser.parse_args()
 
+    scanner = None
+    
     try:
         message = grapePrint()
         message.intro()
@@ -174,7 +199,7 @@ async def main():
                     name, value = header.split(':', 1)
                     headers[name.strip()] = value.strip()
                 except ValueError:
-                    message.printMsg(f"Invalid header format: {header}. Expected 'name:value'", status="error")
+                    message.printMsg(f"Invalid header format: {header}. Expected 'name:value'", status="failed")
         
         if args.headers_file:
             file_headers = load_json_file(args.headers_file)
@@ -189,7 +214,7 @@ async def main():
                     name, value = cookie.split(':', 1)
                     cookies[name.strip()] = value.strip()
                 except ValueError:
-                    message.printMsg(f"Invalid cookie format: {cookie}. Expected 'name:value'", status="error")
+                    message.printMsg(f"Invalid cookie format: {cookie}. Expected 'name:value'", status="failed")
         
         if args.cookies_file:
             file_cookies = load_json_file(args.cookies_file)
@@ -199,11 +224,19 @@ async def main():
         # Set authorization token if provided
         if args.auth:
             headers['Authorization'] = f"{args.auth_type} {args.auth}" if args.auth_type else args.auth
+        
+        # Display proxy information
+        if args.proxy:
+            message.printMsg(f"Configured proxy: {args.proxy}", status="info")
             
         # Direct endpoint testing
         if args.endpoint:
             message.printMsg(f"Testing endpoint: {args.endpoint}", status="log")
             start_time = time.time()
+            
+            # Display credential information
+            if args.username and args.password:
+                message.printMsg(f"Using credentials - Username: {args.username}, Password: {args.password}", status="info")
             
             # Run all security tests
             results = await run_security_tests(
@@ -213,7 +246,8 @@ async def main():
                 cookies=cookies,
                 username=args.username,
                 password=args.password,
-                dos_testing=args.dos
+                dos_testing=args.dos,
+                debug_mode=args.debug
             )
             
             # Generate report if requested
@@ -233,63 +267,110 @@ async def main():
             # Create scanner and discover endpoints
             scanner = GraphQLScanner()
             
-            # Set custom headers and cookies
-            if headers:
-                scanner.set_headers(headers)
-            if cookies:
-                scanner.set_cookies(cookies)
+            try:
+                # Set debug mode if enabled
+                if args.debug:
+                    scanner.set_debug_mode(True)
+                    message.printMsg("Debug mode enabled", status="info")
                 
-            # Discover endpoints
-            endpoints = await scanner.discover_endpoints(args.target, args.proxy)
+                # Set credentials
+                if args.username and args.password:
+                    scanner.set_credentials(args.username, args.password)
+                    message.printMsg(f"Using credentials - Username: {args.username}, Password: {args.password}", status="info")
+                
+                # Set custom headers and cookies
+                if headers:
+                    scanner.set_headers(headers)
+                if cookies:
+                    scanner.set_cookies(cookies)
+                    
+                # Set proxy if provided
+                if args.proxy:
+                    message.printMsg(f"Using proxy: {args.proxy}", status="info")
+                    if not scanner.client.set_proxy_from_string(args.proxy):
+                        message.printMsg(f"Invalid proxy format: {args.proxy}", status="failed")
+                        return 1
+                
+                # Discover endpoints
+                endpoints = await scanner.discover_endpoints(args.target, args.proxy)
+                
+                if not endpoints:
+                    message.printMsg("No GraphQL endpoints found", status="warning")
+                    return 0
+                    
+                message.printMsg(f"Found {len(endpoints)} GraphQL endpoints", status="success")
+                
+                # Test each endpoint and collect results
+                all_results = []
+                for endpoint in endpoints:
+                    message.printMsg(f"Testing endpoint: {endpoint}", status="log")
+                    
+                    # Run security tests
+                    results = await run_security_tests(
+                        endpoint=endpoint,
+                        proxy=args.proxy,
+                        headers=headers,
+                        cookies=cookies,
+                        username=args.username,
+                        password=args.password,
+                        dos_testing=args.dos,
+                        debug_mode=args.debug
+                    )
+                    
+                    all_results.append({"endpoint": endpoint, "results": results})
+                
+                # Generate report if requested
+                if args.report and all_results:
+                    from .report import generate_report
+                    generate_report(args.report, all_results)
+                    message.printMsg(f"Report generated: {args.report}", status="success")
+                    
+                end_time = time.time()
+                message.printMsg(f"Scan completed in {end_time - start_time:.2f} seconds", status="success")
             
-            if not endpoints:
-                message.printMsg("No GraphQL endpoints found", status="warning")
-                return 0
-                
-            message.printMsg(f"Found {len(endpoints)} GraphQL endpoints", status="success")
-            
-            # Test each endpoint and collect results
-            all_results = []
-            for endpoint in endpoints:
-                message.printMsg(f"Testing endpoint: {endpoint}", status="log")
-                
-                # Run security tests
-                results = await run_security_tests(
-                    endpoint=endpoint,
-                    proxy=args.proxy,
-                    headers=headers,
-                    cookies=cookies,
-                    username=args.username,
-                    password=args.password,
-                    dos_testing=args.dos
-                )
-                
-                all_results.append({"endpoint": endpoint, "results": results})
-            
-            # Generate report if requested
-            if args.report and all_results:
-                from .report import generate_report
-                generate_report(args.report, all_results)
-                message.printMsg(f"Report generated: {args.report}", status="success")
-                
-            end_time = time.time()
-            message.printMsg(f"Scan completed in {end_time - start_time:.2f} seconds", status="success")
+            finally:
+                # Always clean up resources
+                if scanner:
+                    await scanner.close()
             
         return 0
 
     except Exception as e:
-        message.printMsg(f"Error during execution: {str(e)}", status="error")
+        message.printMsg(f"Error during execution: {str(e)}", status="failed")
         return 1
+    
+    finally:
+        # Final cleanup for any remaining sessions
+        if scanner:
+            await scanner.close()
+        
+        # Force cleanup of any remaining asyncio resources
+        # This helps prevent "Unclosed client session" warnings
+        tasks = [task for task in asyncio.all_tasks() if task is not asyncio.current_task()]
+        if tasks:
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
 
 
 def run_cli():
     """
     Entry point for the command-line interface.
     """
-    exit_code = asyncio.run(main())
-    exit(exit_code)
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        exit_code = loop.run_until_complete(main())
+        # Clean up pending tasks
+        pending = asyncio.all_tasks(loop)
+        if pending:
+            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+        loop.close()
+        exit(exit_code)
+    except KeyboardInterrupt:
+        print("\nOperation cancelled by user")
+        exit(1)
 
 
 if __name__ == "__main__":
-    exit_code = asyncio.run(main())
-    exit(exit_code)
+    run_cli()

@@ -10,6 +10,7 @@ import asyncio
 from typing import Dict, List, Optional, Any, Union
 import json
 import shutil
+import time
 
 
 class GraphQLHTTPClient:
@@ -26,6 +27,12 @@ class GraphQLHTTPClient:
         self.last_response = None
         self._session: Optional[aiohttp.ClientSession] = None
         self._session_lock = asyncio.Lock()
+        self.debug_mode = False
+        self.request_times = []
+        
+    def set_debug_mode(self, debug_mode: bool = True) -> None:
+        """Enable or disable debug mode."""
+        self.debug_mode = debug_mode
         
     async def ensure_session(self):
         """Ensure an aiohttp client session exists."""
@@ -138,6 +145,22 @@ class GraphQLHTTPClient:
         session = await self.ensure_session()
         
         try:
+            # Add debugging output for the request if enabled
+            if self.debug_mode:
+                print(f"\n=== REQUEST DETAILS ===")
+                print(f"Method: {method}")
+                print(f"URL: {url}")
+                print(f"Headers: {json.dumps(all_headers, indent=2)}")
+                print(f"Cookies: {json.dumps(all_cookies, indent=2)}")
+                print(f"Proxy: {self.proxy_url}")
+                if 'json' in kwargs:
+                    print(f"JSON Payload: {json.dumps(kwargs['json'], indent=2)}")
+                elif 'data' in kwargs:
+                    print(f"Form Data: {kwargs['data']}")
+                
+            # Time the request
+            start_time = time.time()
+            
             async with session.request(
                 method,
                 url,
@@ -148,6 +171,11 @@ class GraphQLHTTPClient:
                 timeout=timeout,
                 **kwargs
             ) as response:
+                # Calculate response time
+                end_time = time.time()
+                response_time = end_time - start_time
+                self.request_times.append(response_time)
+                
                 # Store for reference
                 self.last_response = response
                 
@@ -159,10 +187,24 @@ class GraphQLHTTPClient:
                     text = await response.text()
                     result = {"text": text, "status": response.status}
                     
+                # Add response time to result
+                result["response_time"] = response_time
+                
+                # Add debugging output for the response if enabled
+                if self.debug_mode:
+                    print(f"\n=== RESPONSE DETAILS ===")
+                    print(f"Status: {response.status}")
+                    print(f"Headers: {json.dumps(dict(response.headers), indent=2)}")
+                    print(f"Response Time: {response_time:.4f} seconds")
+                    print(f"Response Body: {json.dumps(result, indent=2)}")
+                    
                 return result
         except asyncio.TimeoutError:
             return {"errors": [{"message": "Request timed out"}], "status": "timeout"}
         except Exception as e:
+            if self.debug_mode:
+                print(f"\n=== REQUEST ERROR ===")
+                print(f"Error: {str(e)}")
             return {"errors": [{"message": str(e)}], "status": "error"}
     
     async def graphql(
@@ -290,6 +332,28 @@ class GraphQLHTTPClient:
         result = await self.graphql(query)
         return bool(result.get("data", {}).get("__schema"))
     
+    def get_response_time_stats(self) -> Dict:
+        """
+        Get statistics about response times.
+        
+        Returns:
+            Dict: Response time statistics
+        """
+        if not self.request_times:
+            return {
+                "count": 0,
+                "min": None,
+                "max": None,
+                "avg": None
+            }
+            
+        return {
+            "count": len(self.request_times),
+            "min": min(self.request_times),
+            "max": max(self.request_times),
+            "avg": sum(self.request_times) / len(self.request_times)
+        }
+    
     def generate_curl(self) -> str:
         """
         Generate a curl command for the last request.
@@ -322,6 +386,10 @@ class GraphQLHTTPClient:
                 else str(response._body)
             )
             command.extend(["-d", f"'{body}'"])
+            
+        # Add proxy if set
+        if self.proxy_url:
+            command.extend(["-x", f"'{self.proxy_url}'"])
             
         command.append(url)
             

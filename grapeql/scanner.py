@@ -7,6 +7,7 @@ Version: 3.0
 
 import asyncio
 import socket
+import json
 from typing import Dict, List, Optional, Set, Tuple, Any
 from .grapePrint import grapePrint
 from .http_client import GraphQLHTTPClient
@@ -64,6 +65,7 @@ class GraphQLScanner:
     def set_debug_mode(self, debug_mode: bool = True) -> None:
         """Enable or disable debug mode."""
         self.debug_mode = debug_mode
+        self.client.set_debug_mode(debug_mode)
         
     def set_credentials(self, username: str, password: str) -> None:
         """Set credentials for authentication testing."""
@@ -120,7 +122,7 @@ class GraphQLScanner:
         # Configure proxy if provided
         if proxy:
             if not self.client.set_proxy_from_string(proxy):
-                self.message.printMsg("Invalid proxy format. Expected host:port", status="error")
+                self.message.printMsg("Invalid proxy format. Expected host:port", status="failed")
                 return False
         
         try:
@@ -150,16 +152,17 @@ class GraphQLScanner:
                     self.message.printMsg("GraphQL endpoint confirmed, but introspection is disabled", status="warning")
                     return True
                     
-                self.message.printMsg("Endpoint is not a GraphQL API or is not accessible", status="error")
+                self.message.printMsg("Endpoint is not a GraphQL API or is not accessible", status="failed")
                 return False
                 
         except Exception as e:
-            self.message.printMsg(f"Error connecting to endpoint: {str(e)}", status="error")
+            self.message.printMsg(f"Error connecting to endpoint: {str(e)}", status="failed")
             return False
     
     async def close(self) -> None:
         """Clean up resources."""
-        await self.client.close()
+        if self.client:
+            await self.client.close()
     
     # Port scanning methods
     
@@ -299,14 +302,15 @@ class GraphQLScanner:
         # Configure proxy if provided
         if proxy:
             if not self.client.set_proxy_from_string(proxy):
-                self.message.printMsg("Invalid proxy format. Expected host:port", status="error")
+                self.message.printMsg("Invalid proxy format. Expected host:port", status="failed")
                 return []
+            self.message.printMsg(f"Using proxy: {proxy} for endpoint discovery", status="info")
         
         # Scan ports
         open_ports = await self.scan_common_ports(target)
         
         if not open_ports:
-            self.message.printMsg("No open ports found, cannot continue", status="error")
+            self.message.printMsg("No open ports found, cannot continue", status="failed")
             return []
         
         # Check both HTTP and HTTPS for each port
@@ -342,10 +346,10 @@ class GraphQLScanner:
             Dict: Information about the detected engine
         """
         if not self.client.endpoint:
-            self.message.printMsg("No endpoint set", status="error")
+            self.message.printMsg("No endpoint set", status="failed")
             return {"name": "unknown", "technology": ["Unknown"]}
         
-        self.message.printMsg("Detecting GraphQL engine...", status="log")
+        self.message.printMsg("Detecting GraphQL server...", status="log")
         
         # Default response if detection fails
         engine_info = {
@@ -354,52 +358,219 @@ class GraphQLScanner:
             "technology": ["Unknown"]
         }
         
+        # First, try to gather information about the server
         try:
-            # Test for Apollo Server
-            query = "query @deprecated { __typename }"
-            result = await self.client.graphql(query)
+            # Check HTTP headers for clues (before any GraphQL-specific tests)
+            headers_result = await self.client.request("GET")
+            headers = {}
             
-            if any("may not be used on QUERY" in str(err.get("message", "")) 
-                   for err in result.get("errors", [])):
+            # Try to extract headers from the response if available
+            if hasattr(self.client, "last_response") and self.client.last_response:
+                response = self.client.last_response
+                if hasattr(response, "headers"):
+                    headers = dict(response.headers)
+            
+            # Log headers for debugging
+            if self.debug_mode and headers:
+                self.message.printMsg(f"Server headers: {json.dumps(headers, indent=2)}", status="info")
+            
+            # Check for common server headers
+            server_header = headers.get("Server", "").lower()
+            if "express" in server_header:
+                engine_info["possible_technology"] = ["Node.js", "Express"]
+            elif "nginx" in server_header:
+                engine_info["possible_proxy"] = "Nginx"
+            elif "apache" in server_header:
+                engine_info["possible_proxy"] = "Apache"
+            
+            # Look for GraphQL-specific fingerprints
+            try:
+                # Test for Apollo Server
+                query = "query @deprecated { __typename }"
+                result = await self.client.graphql(query)
+                
+                # Debug output
+                if self.debug_mode:
+                    self.message.printMsg(f"Apollo Server test result: {json.dumps(result, indent=2)}", status="info")
+                
+                errors_text = str(result.get("errors", []))
+                if "may not be used on QUERY" in errors_text or "directive is not supported" in errors_text:
+                    engine_info = {
+                        "name": "Apollo Server",
+                        "url": "https://www.apollographql.com/",
+                        "technology": ["Node.js", "JavaScript"]
+                    }
+                    self.message.printMsg("Detected Apollo Server", status="success")
+                    return engine_info
+                
+                # Test for GraphQL-Java / Spring GraphQL
+                if any("InvalidSyntax" in str(err.get("extensions", {}).get("classification", "")) 
+                    for err in result.get("errors", [])):
+                    engine_info = {
+                        "name": "GraphQL-Java / Spring GraphQL",
+                        "url": "https://www.graphql-java.com/",
+                        "technology": ["Java", "Spring"]
+                    }
+                    self.message.printMsg("Detected GraphQL-Java or Spring GraphQL", status="success")
+                    return engine_info
+                
+                # Test for Graphene
+                query = "aaa"  # Invalid query
+                result = await self.client.graphql(query)
+                
+                # Debug output
+                if self.debug_mode:
+                    self.message.printMsg(f"Graphene test result: {json.dumps(result, indent=2)}", status="info")
+                
+                if any("Syntax Error GraphQL" in str(err.get("message", "")) 
+                    for err in result.get("errors", [])):
+                    engine_info = {
+                        "name": "Graphene",
+                        "url": "https://graphene-python.org/",
+                        "technology": ["Python"]
+                    }
+                    self.message.printMsg("Detected Graphene", status="success")
+                    return engine_info
+                
+                # Test for Hasura
+                query = "query { __typename }"
+                result = await self.client.graphql(query)
+                
+                # Debug output
+                if self.debug_mode:
+                    self.message.printMsg(f"Hasura test result: {json.dumps(result, indent=2)}", status="info")
+                
+                if result.get("data", {}).get("__typename") == "query_root":
+                    engine_info = {
+                        "name": "Hasura",
+                        "url": "https://hasura.io/",
+                        "technology": ["Haskell", "PostgreSQL"]
+                    }
+                    self.message.printMsg("Detected Hasura", status="success")
+                    return engine_info
+                
+                # Test for GraphQL.NET
+                query = "{ __schema { description } }"
+                result = await self.client.graphql(query)
+                
+                # Debug output
+                if self.debug_mode:
+                    self.message.printMsg(f"GraphQL.NET test result: {json.dumps(result, indent=2)}", status="info")
+                
+                if any("The field 'description' is not defined" in str(err.get("message", ""))
+                    for err in result.get("errors", [])):
+                    engine_info = {
+                        "name": "GraphQL.NET",
+                        "url": "https://github.com/graphql-dotnet/graphql-dotnet",
+                        "technology": [".NET", "C#"]
+                    }
+                    self.message.printMsg("Detected GraphQL.NET", status="success")
+                    return engine_info
+                
+                # Test for Laravel Lighthouse
+                query = "aaa"  # Invalid query
+                result = await self.client.graphql(query)
+                
+                # Debug output
+                if self.debug_mode:
+                    self.message.printMsg(f"Laravel Lighthouse test result: {json.dumps(result, indent=2)}", status="info")
+                
+                if any("Syntax Error: Unexpected Name" in str(err.get("message", "")) 
+                    for err in result.get("errors", [])):
+                    engine_info = {
+                        "name": "Laravel Lighthouse",
+                        "url": "https://lighthouse-php.com/",
+                        "technology": ["PHP", "Laravel"]
+                    }
+                    self.message.printMsg("Detected Laravel Lighthouse", status="success")
+                    return engine_info
+                
+                # Test for Strawberry GraphQL (Python)
+                query = "query { __typename }"
+                headers = dict(self.client.headers)
+                self.client.set_header("Accept", "text/html")
+                result = await self.client.request("GET")
+                self.client.headers = headers
+                
+                # Debug output
+                if self.debug_mode:
+                    self.message.printMsg(f"Strawberry GraphQL test result: {json.dumps(result, indent=2)}", status="info")
+                
+                response_text = str(result.get("text", ""))
+                if "strawberry-graphql" in response_text.lower():
+                    engine_info = {
+                        "name": "Strawberry GraphQL",
+                        "url": "https://strawberry.rocks/",
+                        "technology": ["Python"]
+                    }
+                    self.message.printMsg("Detected Strawberry GraphQL", status="success")
+                    return engine_info
+                
+                # Test for Ariadne (Python)
+                if any("The query is invalid" in str(err.get("message", "")) 
+                    for err in result.get("errors", [])):
+                    engine_info = {
+                        "name": "Ariadne",
+                        "url": "https://ariadnegraphql.org/",
+                        "technology": ["Python"]
+                    }
+                    self.message.printMsg("Detected Ariadne", status="success")
+                    return engine_info
+                
+                # Test for Juniper (Rust)
+                query = "{ notARealField }"
+                result = await self.client.graphql(query)
+                if any("unknown field" in str(err.get("message", "")).lower() 
+                    for err in result.get("errors", [])):
+                    engine_info = {
+                        "name": "Juniper",
+                        "url": "https://github.com/graphql-rust/juniper",
+                        "technology": ["Rust"]
+                    }
+                    self.message.printMsg("Detected Juniper (Rust)", status="success")
+                    return engine_info
+                
+                # Check for general GraphQL identification
+                query = "query { __typename }"
+                result = await self.client.graphql(query)
+                
+                if "data" in result and "__typename" in result.get("data", {}):
+                    typename = result["data"]["__typename"] 
+                    engine_info = {
+                        "name": f"Unknown GraphQL Implementation (typename: {typename})",
+                        "url": "",
+                        "technology": ["GraphQL"],
+                        "typename": typename
+                    }
+                    self.message.printMsg(f"Detected GraphQL server with typename: {typename}", status="info")
+                    return engine_info
+            
+            except Exception as e:
+                self.message.printMsg(f"Error during GraphQL detection tests: {str(e)}", status="warning")
+                
+            # Unknown engine but we might have some info from headers
+            if "possible_technology" in engine_info or "possible_proxy" in engine_info:
+                tech = engine_info.get("possible_technology", [])
+                proxy = engine_info.get("possible_proxy", "")
+                
+                details = []
+                if tech:
+                    details.append(f"Possible technology: {', '.join(tech)}")
+                if proxy:
+                    details.append(f"Possible proxy: {proxy}")
+                
                 engine_info = {
-                    "name": "Apollo Server",
-                    "url": "https://www.apollographql.com/",
-                    "technology": ["Node.js", "JavaScript"]
+                    "name": "unknown",
+                    "url": "",
+                    "technology": tech if tech else ["Unknown"],
+                    "details": ". ".join(details)
                 }
-                self.message.printMsg("Detected Apollo Server", status="success")
-                return engine_info
-            
-            # Test for Graphene
-            query = "aaa"  # Invalid query
-            result = await self.client.graphql(query)
-            
-            if any("Syntax Error GraphQL" in str(err.get("message", "")) 
-                   for err in result.get("errors", [])):
-                engine_info = {
-                    "name": "Graphene",
-                    "url": "https://graphene-python.org/",
-                    "technology": ["Python"]
-                }
-                self.message.printMsg("Detected Graphene", status="success")
-                return engine_info
-            
-            # Test for Hasura
-            query = "query { __typename }"
-            result = await self.client.graphql(query)
-            
-            if result.get("data", {}).get("__typename") == "query_root":
-                engine_info = {
-                    "name": "Hasura",
-                    "url": "https://hasura.io/",
-                    "technology": ["Haskell", "PostgreSQL"]
-                }
-                self.message.printMsg("Detected Hasura", status="success")
+                self.message.printMsg(f"Partial detection: {engine_info.get('details', '')}", status="info")
                 return engine_info
                 
-            # Unknown engine
             self.message.printMsg("Could not identify GraphQL engine implementation", status="warning")
             return engine_info
             
         except Exception as e:
-            self.message.printMsg(f"Error during engine detection: {str(e)}", status="error")
+            self.message.printMsg(f"Error during engine detection: {str(e)}", status="failed")
             return engine_info
