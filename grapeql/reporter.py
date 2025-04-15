@@ -179,11 +179,8 @@ GrapeQL conducted a security assessment of the GraphQL API at {self.target}. Thi
             if finding.remediation:
                 report += f"**Remediation:** {finding.remediation}\n\n"
                 
-            if finding.curl_command:
-                report += "**Proof of Concept:**\n\n```bash\n"
-                report += finding.curl_command
-                report += "\n```\n\n"
-                
+            # Removed curl_command section
+            
             report += "---\n\n"
             
         # Add remediation summary
@@ -228,8 +225,16 @@ GrapeQL conducted a security assessment of the GraphQL API at {self.target}. Thi
             "target": self.target,
             "scan_time": time.strftime("%Y-%m-%d %H:%M:%S"),
             "findings_count": len(self.findings),
-            "findings": [finding.to_dict() for finding in self.findings]
+            "findings": []
         }
+        
+        # Convert findings to dict but exclude curl_command
+        for finding in self.findings:
+            finding_dict = finding.to_dict()
+            # Remove curl_command if it exists
+            if 'curl_command' in finding_dict:
+                del finding_dict['curl_command']
+            report_data["findings"].append(finding_dict)
         
         # Convert to JSON
         report_json = json.dumps(report_data, indent=2)

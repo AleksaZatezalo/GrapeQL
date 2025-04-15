@@ -150,7 +150,6 @@ class Finding:
         severity: str,
         description: str,
         endpoint: str,
-        curl_command: Optional[str] = None,
         impact: Optional[str] = None,
         remediation: Optional[str] = None
     ):
@@ -162,7 +161,6 @@ class Finding:
             severity: Severity level (LOW, MEDIUM, HIGH, CRITICAL)
             description: Description of the finding
             endpoint: Affected endpoint
-            curl_command: Optional cURL command to reproduce
             impact: Optional impact description
             remediation: Optional remediation instructions
         """
@@ -170,7 +168,6 @@ class Finding:
         self.severity = severity.upper()
         self.description = description
         self.endpoint = endpoint
-        self.curl_command = curl_command
         self.impact = impact
         self.remediation = remediation
         self.timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -182,7 +179,6 @@ class Finding:
             "severity": self.severity,
             "description": self.description,
             "endpoint": self.endpoint,
-            "curl_command": self.curl_command,
             "impact": self.impact,
             "remediation": self.remediation,
             "timestamp": self.timestamp

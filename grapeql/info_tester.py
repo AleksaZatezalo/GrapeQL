@@ -49,7 +49,6 @@ class InfoTester(VulnerabilityTester):
                 severity="LOW",
                 description="The GraphQL server is providing field suggestions in error messages, which can help attackers discover schema information",
                 endpoint=self.client.endpoint,
-                curl_command=self.client.generate_curl(),
                 impact="Information Leakage - Schema details are being disclosed",
                 remediation="Disable field suggestions in production environments"
             )
@@ -83,7 +82,6 @@ class InfoTester(VulnerabilityTester):
                 severity="MEDIUM",
                 description="The GraphQL server allows queries via GET requests, which may enable cross-site request forgery (CSRF) attacks",
                 endpoint=self.client.endpoint,
-                curl_command=self.client.generate_curl(),
                 impact="Attackers may be able to execute operations using the victim's credentials",
                 remediation="Disable GET method for GraphQL queries or implement proper CSRF protections"
             )
@@ -117,7 +115,6 @@ class InfoTester(VulnerabilityTester):
                 severity="HIGH",
                 description="The GraphQL server allows mutations via GET requests, which enables cross-site request forgery (CSRF) attacks",
                 endpoint=self.client.endpoint,
-                curl_command=self.client.generate_curl(),
                 impact="Attackers can modify data using the victim's credentials",
                 remediation="Disable GET method for GraphQL mutations and implement proper CSRF protections"
             )
@@ -153,7 +150,6 @@ class InfoTester(VulnerabilityTester):
                     severity="MEDIUM",
                     description="The GraphQL server accepts queries via URL-encoded form data, which may enable cross-site request forgery (CSRF) attacks",
                     endpoint=self.client.endpoint,
-                    curl_command=self.client.generate_curl(),
                     impact="Attackers may be able to execute operations using the victim's credentials",
                     remediation="Only accept application/json content type for GraphQL operations"
                 )
@@ -242,7 +238,6 @@ class InfoTester(VulnerabilityTester):
                 severity="LOW",
                 description="The GraphQL server supports query batching, which can be used to amplify attacks",
                 endpoint=self.client.endpoint,
-                curl_command=self.client.generate_curl(),
                 impact="Attackers can send multiple operations in a single request, potentially bypassing rate limits",
                 remediation="Implement per-operation rate limiting and set maximum batch size limits"
             )

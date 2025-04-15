@@ -50,6 +50,9 @@ Examples:
   
   # Generate a report
   python -m grapeql --api https://example.com/graphql --report report.md
+  
+  # Test with specific injection credentials
+  python -m grapeql --api https://example.com/graphql --username test_user --password test_pass
             """
         )
         
@@ -102,6 +105,17 @@ Examples:
             help="Report format (markdown or json, default: markdown)",
             default="markdown",
             choices=["markdown", "json"]
+        )
+        
+        # Injection testing credentials
+        parser.add_argument(
+            "--username",
+            help="Username to use for injection testing (default: admin)"
+        )
+        
+        parser.add_argument(
+            "--password",
+            help="Password to use for injection testing (default: changeme)"
         )
         
         return parser.parse_args()
@@ -178,6 +192,17 @@ Examples:
             injection_tester = InjectionTester()
             if await injection_tester.setup_endpoint(args.api, args.proxy):
                 self.setup_client(injection_tester.client, args)
+                
+                # Set custom credentials for injection testing if provided
+                if args.username or args.password:
+                    username = args.username or "admin"  # Use default if not provided
+                    password = args.password or "changeme"  # Use default if not provided
+                    injection_tester.set_credentials(username, password)
+                    self.printer.print_msg(
+                        f"Using custom injection testing credentials: {username}:{password}",
+                        status="log"
+                    )
+                
                 await injection_tester.run_test()
                 self.reporter.add_findings(injection_tester.get_findings())
             

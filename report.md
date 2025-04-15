@@ -1,7 +1,7 @@
 # GrapeQL Security Assessment Report
 
 ## Target: http://127.0.0.1:5013/graphql
-## Date: 2025-04-15 23:57:55
+## Date: 2025-04-16 00:22:20
 
 ## Executive Summary
 
@@ -12,12 +12,12 @@ GrapeQL conducted a security assessment of the GraphQL API at http://127.0.0.1:5
 | Severity | Count |
 |----------|-------|
 | CRITICAL | 0 |
-| HIGH | 1 |
+| HIGH | 11 |
 | MEDIUM | 2 |
 | LOW | 2 |
 | INFO | 1 |
 
-Total: 6 findings
+Total: 16 findings
 
 ## Detailed Findings
 
@@ -33,15 +33,149 @@ Total: 6 findings
 
 **Remediation:** Implement proper input validation and sanitize user inputs
 
-**Proof of Concept:**
+---
 
-```bash
-curl -X POST http://127.0.0.1:5013/graphql -H 'Host:127.0.0.1:5013' -H 'Content-Type:application/json' -H 'Authorization:Bearer 12345' -H 'Accept:*/*' -H 'Accept-Encoding:gzip, deflate' -H 'User-Agent:Python/3.13 aiohttp/3.11.16' -H 'Cookie:session=test-cookie' -H 'Content-Length:162' -d '{"data":{"systemDiagnostics":"Linux 51986c44f586 5.15.167.4-microsoft-standard-WSL2 #1 SMP Tue Nov 5 00:21:55 UTC 2024 x86_64 Linux\n"}}'
-```
+### 2. DoS Vulnerability: Circular Query DoS
+
+**Severity:** HIGH
+
+**Endpoint:** http://127.0.0.1:5013/graphql
+
+**Description:** The GraphQL endpoint is vulnerable to denial of service through circular query dos. Response time: 10.89 seconds.
+
+**Impact:** Server resources can be exhausted, potentially causing service outages
+
+**Remediation:** Implement query depth limiting, timeout controls, and query cost analysis
 
 ---
 
-### 2. URL-encoded POST Queries Enabled (Possible CSRF)
+### 3. DoS Vulnerability: Circular Query DoS
+
+**Severity:** HIGH
+
+**Endpoint:** http://127.0.0.1:5013/graphql
+
+**Description:** The GraphQL endpoint is vulnerable to denial of service through circular query dos. Response time: 10.89 seconds.
+
+**Impact:** Server resources can be exhausted, potentially causing service outages
+
+**Remediation:** Implement query depth limiting, timeout controls, and query cost analysis
+
+---
+
+### 4. DoS Vulnerability: Field Duplication DoS
+
+**Severity:** HIGH
+
+**Endpoint:** http://127.0.0.1:5013/graphql
+
+**Description:** The GraphQL endpoint is vulnerable to denial of service through field duplication dos. Response time: 10.98 seconds.
+
+**Impact:** Server resources can be exhausted, potentially causing service outages
+
+**Remediation:** Implement query depth limiting, timeout controls, and query cost analysis
+
+---
+
+### 5. DoS Vulnerability: Field Duplication DoS
+
+**Severity:** HIGH
+
+**Endpoint:** http://127.0.0.1:5013/graphql
+
+**Description:** The GraphQL endpoint is vulnerable to denial of service through field duplication dos. Response time: 10.98 seconds.
+
+**Impact:** Server resources can be exhausted, potentially causing service outages
+
+**Remediation:** Implement query depth limiting, timeout controls, and query cost analysis
+
+---
+
+### 6. DoS Vulnerability: Deeply Nested Query DoS
+
+**Severity:** HIGH
+
+**Endpoint:** http://127.0.0.1:5013/graphql
+
+**Description:** The GraphQL endpoint is vulnerable to denial of service through deeply nested query dos. Response time: 11.01 seconds.
+
+**Impact:** Server resources can be exhausted, potentially causing service outages
+
+**Remediation:** Implement query depth limiting, timeout controls, and query cost analysis
+
+---
+
+### 7. DoS Vulnerability: Deeply Nested Query DoS
+
+**Severity:** HIGH
+
+**Endpoint:** http://127.0.0.1:5013/graphql
+
+**Description:** The GraphQL endpoint is vulnerable to denial of service through deeply nested query dos. Response time: 11.01 seconds.
+
+**Impact:** Server resources can be exhausted, potentially causing service outages
+
+**Remediation:** Implement query depth limiting, timeout controls, and query cost analysis
+
+---
+
+### 8. DoS Vulnerability: Fragment Bomb DoS
+
+**Severity:** HIGH
+
+**Endpoint:** http://127.0.0.1:5013/graphql
+
+**Description:** The GraphQL endpoint is vulnerable to denial of service through fragment bomb dos. Response time: 10.98 seconds.
+
+**Impact:** Server resources can be exhausted, potentially causing service outages
+
+**Remediation:** Implement query depth limiting, timeout controls, and query cost analysis
+
+---
+
+### 9. DoS Vulnerability: Fragment Bomb DoS
+
+**Severity:** HIGH
+
+**Endpoint:** http://127.0.0.1:5013/graphql
+
+**Description:** The GraphQL endpoint is vulnerable to denial of service through fragment bomb dos. Response time: 10.98 seconds.
+
+**Impact:** Server resources can be exhausted, potentially causing service outages
+
+**Remediation:** Implement query depth limiting, timeout controls, and query cost analysis
+
+---
+
+### 10. DoS Vulnerability: Array Batching Attack
+
+**Severity:** HIGH
+
+**Endpoint:** http://127.0.0.1:5013/graphql
+
+**Description:** The GraphQL endpoint is vulnerable to denial of service through array batching. Response time: 10.99 seconds.
+
+**Impact:** Server resources can be exhausted by sending many queries in a single request
+
+**Remediation:** Limit the number of operations allowed in a batch request
+
+---
+
+### 11. DoS Vulnerability: Array Batching Attack
+
+**Severity:** HIGH
+
+**Endpoint:** http://127.0.0.1:5013/graphql
+
+**Description:** The GraphQL endpoint is vulnerable to denial of service through array batching. Response time: 10.99 seconds.
+
+**Impact:** Server resources can be exhausted by sending many queries in a single request
+
+**Remediation:** Limit the number of operations allowed in a batch request
+
+---
+
+### 12. URL-encoded POST Queries Enabled (Possible CSRF)
 
 **Severity:** MEDIUM
 
@@ -53,15 +187,9 @@ curl -X POST http://127.0.0.1:5013/graphql -H 'Host:127.0.0.1:5013' -H 'Content-
 
 **Remediation:** Only accept application/json content type for GraphQL operations
 
-**Proof of Concept:**
-
-```bash
-curl -X POST http://127.0.0.1:5013/graphql -H 'Host:127.0.0.1:5013' -H 'Content-Type:application/x-www-form-urlencoded' -H 'Authorization:Bearer 12345' -H 'Accept:*/*' -H 'Accept-Encoding:gzip, deflate' -H 'User-Agent:Python/3.13 aiohttp/3.11.16' -H 'Cookie:session=test-cookie' -H 'Content-Length:30' -d '{"data":{"__typename":"Query"}}'
-```
-
 ---
 
-### 3. Introspection Enabled
+### 13. Introspection Enabled
 
 **Severity:** MEDIUM
 
@@ -75,7 +203,7 @@ curl -X POST http://127.0.0.1:5013/graphql -H 'Host:127.0.0.1:5013' -H 'Content-
 
 ---
 
-### 4. Field Suggestions Enabled
+### 14. Field Suggestions Enabled
 
 **Severity:** LOW
 
@@ -87,15 +215,9 @@ curl -X POST http://127.0.0.1:5013/graphql -H 'Host:127.0.0.1:5013' -H 'Content-
 
 **Remediation:** Disable field suggestions in production environments
 
-**Proof of Concept:**
-
-```bash
-curl -X POST http://127.0.0.1:5013/graphql -H 'Host:127.0.0.1:5013' -H 'Content-Type:application/json' -H 'Authorization:Bearer 12345' -H 'Accept:*/*' -H 'Accept-Encoding:gzip, deflate' -H 'User-Agent:Python/3.13 aiohttp/3.11.16' -H 'Cookie:session=test-cookie' -H 'Content-Length:45' -d '{"errors":[{"message":"Cannot query field \"directive\" on type \"__Schema\". Did you mean \"directives\"?","locations":[{"line":1,"column":20}]}]}'
-```
-
 ---
 
-### 5. Query Batching Enabled
+### 15. Query Batching Enabled
 
 **Severity:** LOW
 
@@ -107,15 +229,9 @@ curl -X POST http://127.0.0.1:5013/graphql -H 'Host:127.0.0.1:5013' -H 'Content-
 
 **Remediation:** Implement per-operation rate limiting and set maximum batch size limits
 
-**Proof of Concept:**
-
-```bash
-curl -X POST http://127.0.0.1:5013/graphql -H 'Host:127.0.0.1:5013' -H 'Content-Type:application/json' -H 'Authorization:Bearer 12345' -H 'Accept:*/*' -H 'Accept-Encoding:gzip, deflate' -H 'User-Agent:Python/3.13 aiohttp/3.11.16' -H 'Cookie:session=test-cookie' -H 'Content-Length:70' -d '[{"data":{"__typename":"Query"}},{"data":{"__typename":"Query"}}]'
-```
-
 ---
 
-### 6. GraphQL Engine Identified: Graphene
+### 16. GraphQL Engine Identified: Graphene
 
 **Severity:** INFO
 
@@ -166,4 +282,24 @@ Applies to:
 Applies to:
 
 - Command Injection in systemDiagnostics.cmd
+
+### Implement query depth limiting, timeout controls, and query cost analysis
+
+Applies to:
+
+- DoS Vulnerability: Circular Query DoS
+- DoS Vulnerability: Circular Query DoS
+- DoS Vulnerability: Field Duplication DoS
+- DoS Vulnerability: Field Duplication DoS
+- DoS Vulnerability: Deeply Nested Query DoS
+- DoS Vulnerability: Deeply Nested Query DoS
+- DoS Vulnerability: Fragment Bomb DoS
+- DoS Vulnerability: Fragment Bomb DoS
+
+### Limit the number of operations allowed in a batch request
+
+Applies to:
+
+- DoS Vulnerability: Array Batching Attack
+- DoS Vulnerability: Array Batching Attack
 
