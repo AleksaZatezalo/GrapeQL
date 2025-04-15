@@ -260,12 +260,12 @@ class InjectionTester(VulnerabilityTester):
                 if is_vulnerable:
                     finding = Finding(
                         title=f"Command Injection in {field_name}.{arg_name}",
-                        severity="HIGH",
+                        severity="CRITICAL",  # Changed from HIGH to CRITICAL
                         description=detail,
                         endpoint=self.client.endpoint,
                         # No curl_command included here
-                        impact="Command execution on the server",
-                        remediation="Implement proper input validation and sanitize user inputs"
+                        impact="Command execution on the server, allowing attacker to execute arbitrary code and potentially gain full system access",
+                        remediation="Implement proper input validation, use parameterized queries, avoid passing user input to shell commands, and apply the principle of least privilege"
                     )
                     findings.append(finding)
                     self.add_finding(finding)
