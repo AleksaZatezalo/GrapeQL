@@ -1,6 +1,6 @@
 """
 GrapeQL Scanner Module
-Author: Aleksa Zatezalo (Simplified by Claude)
+Author: Aleksa Zatezalo
 Version: 2.0
 Date: April 2025
 Description: Port scanning and GraphQL endpoint discovery

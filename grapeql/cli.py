@@ -1,9 +1,9 @@
 """
-GrapeQL Command Line Interface (Simplified)
+GrapeQL Command Line Interface
 Author: Aleksa Zatezalo
 Version: 2.0
 Date: April 2025
-Description: Simplified CLI for GrapeQL GraphQL Security Testing Tool
+Description: CLI for GrapeQL GraphQL Security Testing Tool
 """
 
 import asyncio
@@ -22,7 +22,7 @@ from .reporter import Reporter
 
 class GrapeQL:
     """
-    Main class for the GrapeQL CLI with simplified options.
+    Main class for the GrapeQL CLI with options.
     """
     
     def __init__(self):
@@ -32,7 +32,7 @@ class GrapeQL:
         
     def parse_arguments(self):
         """
-        Parse command line arguments with simplified options.
+        Parse command line arguments with options.
         
         Returns:
             argparse.Namespace: Parsed arguments

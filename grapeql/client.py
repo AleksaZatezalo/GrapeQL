@@ -1,6 +1,6 @@
 """
 GrapeQL HTTP Client
-Author: Aleksa Zatezalo (Simplified by Claude)
+Author: Aleksa Zatezalo
 Version: 2.0
 Date: April 2025
 Description: Core HTTP client for GrapeQL with consistent request handling

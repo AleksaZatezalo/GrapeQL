@@ -1,9 +1,9 @@
 """
-GrapeQL Reporter (Simplified)
-Author: Aleksa Zatezalo (Simplified by Claude)
+GrapeQL Reporter
+Author: Aleksa Zatezalo
 Version: 2.0
 Date: April 2025
-Description: Simplified report generation for GrapeQL findings
+Description: Report generation for GrapeQL findings
 """
 
 import os
@@ -14,7 +14,7 @@ from .utils import GrapePrinter, Finding
 
 class Reporter:
     """
-    Generates reports from GrapeQL findings in various formats with simplified options.
+    Generates reports from GrapeQL findings in various formats with options.
     """
     
     def __init__(self):
@@ -35,21 +35,44 @@ class Reporter:
         
     def add_findings(self, findings: List[Finding]) -> None:
         """
-        Add findings to the report.
+        Add findings to the report, avoiding duplicates.
         
         Args:
             findings: List of findings to add
         """
-        self.findings.extend(findings)
+        for finding in findings:
+            self._add_finding_deduplicated(finding)
         
     def add_finding(self, finding: Finding) -> None:
         """
-        Add a single finding to the report.
+        Add a single finding to the report, avoiding duplicates.
         
         Args:
             finding: Finding to add
         """
-        self.findings.append(finding)
+        self._add_finding_deduplicated(finding)
+    
+    def _add_finding_deduplicated(self, finding: Finding) -> None:
+        """
+        Add a finding to the report only if it's not a duplicate.
+        
+        A finding is considered a duplicate if a finding with the same title and endpoint
+        already exists in the findings list.
+        
+        Args:
+            finding: Finding to add
+        """
+        # Check if this finding is a duplicate
+        is_duplicate = False
+        for existing in self.findings:
+            if (existing.title == finding.title and 
+                existing.endpoint == finding.endpoint):
+                is_duplicate = True
+                break
+                
+        # Only add if not a duplicate
+        if not is_duplicate:
+            self.findings.append(finding)
         
     def print_summary(self) -> None:
         """Print a summary of findings to the console."""

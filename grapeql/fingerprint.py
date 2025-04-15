@@ -1,6 +1,6 @@
 """
 GrapeQL Fingerprinting Module
-Author: Aleksa Zatezalo (Simplified by Claude)
+Author: Aleksa Zatezalo
 Version: 2.0
 Date: April 2025
 Description: Fingerprinting module to identify GraphQL engine implementations

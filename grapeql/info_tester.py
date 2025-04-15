@@ -1,6 +1,6 @@
 """
 GrapeQL Information Disclosure Tester
-Author: Aleksa Zatezalo (Simplified by Claude)
+Author: Aleksa Zatezalo
 Version: 2.0
 Date: April 2025
 Description: Tests GraphQL endpoints for information disclosure vulnerabilities

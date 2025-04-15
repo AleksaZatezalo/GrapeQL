@@ -1,7 +1,7 @@
 # GrapeQL Security Assessment Report
 
 ## Target: http://127.0.0.1:5013/graphql
-## Date: 2025-04-16 01:08:35
+## Date: 2025-04-16 01:19:37
 
 ## Executive Summary
 
@@ -12,12 +12,12 @@ GrapeQL conducted a security assessment of the GraphQL API at http://127.0.0.1:5
 | Severity | Count |
 |----------|-------|
 | CRITICAL | 0 |
-| HIGH | 11 |
+| HIGH | 6 |
 | MEDIUM | 2 |
 | LOW | 2 |
 | INFO | 1 |
 
-Total: 16 findings
+Total: 11 findings
 
 ## Detailed Findings
 
@@ -41,7 +41,7 @@ Total: 16 findings
 
 **Endpoint:** http://127.0.0.1:5013/graphql
 
-**Description:** The GraphQL endpoint is vulnerable to denial of service through circular query dos. Response time: 10.88 seconds.
+**Description:** The GraphQL endpoint is vulnerable to denial of service through circular query dos. Response time: 10.25 seconds.
 
 **Impact:** Server resources can be exhausted, potentially causing service outages
 
@@ -49,13 +49,13 @@ Total: 16 findings
 
 ---
 
-### 3. DoS Vulnerability: Circular Query DoS
+### 3. DoS Vulnerability: Field Duplication DoS
 
 **Severity:** HIGH
 
 **Endpoint:** http://127.0.0.1:5013/graphql
 
-**Description:** The GraphQL endpoint is vulnerable to denial of service through circular query dos. Response time: 10.88 seconds.
+**Description:** The GraphQL endpoint is vulnerable to denial of service through field duplication dos. Response time: 11.00 seconds.
 
 **Impact:** Server resources can be exhausted, potentially causing service outages
 
@@ -63,13 +63,13 @@ Total: 16 findings
 
 ---
 
-### 4. DoS Vulnerability: Field Duplication DoS
+### 4. DoS Vulnerability: Deeply Nested Query DoS
 
 **Severity:** HIGH
 
 **Endpoint:** http://127.0.0.1:5013/graphql
 
-**Description:** The GraphQL endpoint is vulnerable to denial of service through field duplication dos. Response time: 10.99 seconds.
+**Description:** The GraphQL endpoint is vulnerable to denial of service through deeply nested query dos. Response time: 10.99 seconds.
 
 **Impact:** Server resources can be exhausted, potentially causing service outages
 
@@ -77,13 +77,13 @@ Total: 16 findings
 
 ---
 
-### 5. DoS Vulnerability: Field Duplication DoS
+### 5. DoS Vulnerability: Fragment Bomb DoS
 
 **Severity:** HIGH
 
 **Endpoint:** http://127.0.0.1:5013/graphql
 
-**Description:** The GraphQL endpoint is vulnerable to denial of service through field duplication dos. Response time: 10.99 seconds.
+**Description:** The GraphQL endpoint is vulnerable to denial of service through fragment bomb dos. Response time: 11.00 seconds.
 
 **Impact:** Server resources can be exhausted, potentially causing service outages
 
@@ -91,69 +91,13 @@ Total: 16 findings
 
 ---
 
-### 6. DoS Vulnerability: Deeply Nested Query DoS
+### 6. DoS Vulnerability: Array Batching Attack
 
 **Severity:** HIGH
 
 **Endpoint:** http://127.0.0.1:5013/graphql
 
-**Description:** The GraphQL endpoint is vulnerable to denial of service through deeply nested query dos. Response time: 11.01 seconds.
-
-**Impact:** Server resources can be exhausted, potentially causing service outages
-
-**Remediation:** Implement query depth limiting, timeout controls, and query cost analysis
-
----
-
-### 7. DoS Vulnerability: Deeply Nested Query DoS
-
-**Severity:** HIGH
-
-**Endpoint:** http://127.0.0.1:5013/graphql
-
-**Description:** The GraphQL endpoint is vulnerable to denial of service through deeply nested query dos. Response time: 11.01 seconds.
-
-**Impact:** Server resources can be exhausted, potentially causing service outages
-
-**Remediation:** Implement query depth limiting, timeout controls, and query cost analysis
-
----
-
-### 8. DoS Vulnerability: Fragment Bomb DoS
-
-**Severity:** HIGH
-
-**Endpoint:** http://127.0.0.1:5013/graphql
-
-**Description:** The GraphQL endpoint is vulnerable to denial of service through fragment bomb dos. Response time: 10.98 seconds.
-
-**Impact:** Server resources can be exhausted, potentially causing service outages
-
-**Remediation:** Implement query depth limiting, timeout controls, and query cost analysis
-
----
-
-### 9. DoS Vulnerability: Fragment Bomb DoS
-
-**Severity:** HIGH
-
-**Endpoint:** http://127.0.0.1:5013/graphql
-
-**Description:** The GraphQL endpoint is vulnerable to denial of service through fragment bomb dos. Response time: 10.98 seconds.
-
-**Impact:** Server resources can be exhausted, potentially causing service outages
-
-**Remediation:** Implement query depth limiting, timeout controls, and query cost analysis
-
----
-
-### 10. DoS Vulnerability: Array Batching Attack
-
-**Severity:** HIGH
-
-**Endpoint:** http://127.0.0.1:5013/graphql
-
-**Description:** The GraphQL endpoint is vulnerable to denial of service through array batching. Response time: 10.99 seconds.
+**Description:** The GraphQL endpoint is vulnerable to denial of service through array batching. Response time: 10.97 seconds.
 
 **Impact:** Server resources can be exhausted by sending many queries in a single request
 
@@ -161,21 +105,7 @@ Total: 16 findings
 
 ---
 
-### 11. DoS Vulnerability: Array Batching Attack
-
-**Severity:** HIGH
-
-**Endpoint:** http://127.0.0.1:5013/graphql
-
-**Description:** The GraphQL endpoint is vulnerable to denial of service through array batching. Response time: 10.99 seconds.
-
-**Impact:** Server resources can be exhausted by sending many queries in a single request
-
-**Remediation:** Limit the number of operations allowed in a batch request
-
----
-
-### 12. URL-encoded POST Queries Enabled (Possible CSRF)
+### 7. URL-encoded POST Queries Enabled (Possible CSRF)
 
 **Severity:** MEDIUM
 
@@ -189,7 +119,7 @@ Total: 16 findings
 
 ---
 
-### 13. Introspection Enabled
+### 8. Introspection Enabled
 
 **Severity:** MEDIUM
 
@@ -203,7 +133,7 @@ Total: 16 findings
 
 ---
 
-### 14. Field Suggestions Enabled
+### 9. Field Suggestions Enabled
 
 **Severity:** LOW
 
@@ -217,7 +147,7 @@ Total: 16 findings
 
 ---
 
-### 15. Query Batching Enabled
+### 10. Query Batching Enabled
 
 **Severity:** LOW
 
@@ -231,7 +161,7 @@ Total: 16 findings
 
 ---
 
-### 16. GraphQL Engine Identified: Graphene
+### 11. GraphQL Engine Identified: Graphene
 
 **Severity:** INFO
 
@@ -288,18 +218,13 @@ Applies to:
 Applies to:
 
 - DoS Vulnerability: Circular Query DoS
-- DoS Vulnerability: Circular Query DoS
-- DoS Vulnerability: Field Duplication DoS
 - DoS Vulnerability: Field Duplication DoS
 - DoS Vulnerability: Deeply Nested Query DoS
-- DoS Vulnerability: Deeply Nested Query DoS
-- DoS Vulnerability: Fragment Bomb DoS
 - DoS Vulnerability: Fragment Bomb DoS
 
 ### Limit the number of operations allowed in a batch request
 
 Applies to:
 
-- DoS Vulnerability: Array Batching Attack
 - DoS Vulnerability: Array Batching Attack
 
