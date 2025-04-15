@@ -7,7 +7,7 @@ Version: 3.0
 
 import json
 import datetime
-from typing import Dict, List, Any
+from typing import Dict, List
 
 
 def generate_report(filename: str, results: List[Dict]) -> None:

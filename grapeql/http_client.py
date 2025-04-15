@@ -1,5 +1,5 @@
 """
-Simplified HTTP client for GraphQL requests
+HTTP client for GraphQL requests
 
 Author: Aleksa Zatezalo
 Version: 3.0
@@ -15,7 +15,7 @@ import shutil
 
 class GraphQLHTTPClient:
     """
-    Simplified HTTP client for making GraphQL requests with proper resource management.
+    An HTTP client for making GraphQL requests with proper resource management.
     """
     
     def __init__(self):

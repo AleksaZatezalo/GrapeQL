@@ -1,5 +1,5 @@
 """
-GrapeQL - A GraphQL Security Testing Tool (Simplified Version)
+GrapeQL - A GraphQL Security Testing Tool.
 
 Author: Aleksa Zatezalo
 Version: 3.0.0

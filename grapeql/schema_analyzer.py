@@ -5,8 +5,7 @@ Author: Aleksa Zatezalo
 Version: 3.0
 """
 
-from typing import Dict, List, Optional, Any, Set
-
+from typing import Dict, List, Optional
 
 class SchemaAnalyzer:
     """
