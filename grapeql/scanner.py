@@ -49,6 +49,7 @@ class GraphQLScanner:
             3000,   # Node.js/React
             4000,   # Node.js/React
             5000,   # Python/Flask
+            5013,   # DVGA
             8000,   # Python/Django
             9000,   # PHP/Node.js
         ]

@@ -9,7 +9,6 @@ import aiohttp
 import asyncio
 from typing import Dict, List, Optional, Any, Union
 import json
-import atexit
 import shutil
 
 
@@ -28,18 +27,6 @@ class GraphQLHTTPClient:
         self._session: Optional[aiohttp.ClientSession] = None
         self._session_lock = asyncio.Lock()
         
-        # Register cleanup function
-        atexit.register(self._cleanup)
-        
-    def _cleanup(self):
-        """Cleanup resources when the program exits."""
-        if self._session and not self._session.closed:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                loop.create_task(self.close())
-            else:
-                loop.run_until_complete(self.close())
-    
     async def ensure_session(self):
         """Ensure an aiohttp client session exists."""
         async with self._session_lock:

