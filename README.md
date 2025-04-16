@@ -17,12 +17,6 @@ GrapeQL is a powerful, modular GraphQL security testing tool designed to identif
 
 ## Installation
 
-### From PyPI (Recommended)
-
-```bash
-pip install grapeql
-```
-
 ### From Source
 
 To install GrapeQL directly from the source code:
@@ -33,9 +27,6 @@ git clone https://github.com/zatezalo/grapeql.git
 
 # Navigate to the project directory
 cd grapeql
-
-# Install the package in development mode
-pip install -e .
 
 # Or install for regular use
 pip install .
