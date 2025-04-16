@@ -11,6 +11,7 @@ GrapeQL is a powerful, modular GraphQL security testing tool designed to identif
 - **GraphQL Fingerprinting**: Identify the underlying GraphQL engine
 - **Information Disclosure Testing**: Detect schema leaks, field suggestions, and insecure configurations
 - **Injection Testing**: Test for command injection vulnerabilities
+- **SQL Injection:** Tests for SQL injection in GraphQL queries and mutations
 - **Denial of Service Testing**: Identify DoS vulnerabilities through circular queries, deeply nested queries, and more
 - **Comprehensive Reporting**: Generate detailed reports in Markdown or JSON formats
 
