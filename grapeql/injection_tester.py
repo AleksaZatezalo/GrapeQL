@@ -112,17 +112,8 @@ class InjectionTester(VulnerabilityTester):
             
         # Build arguments string including all required fields
         arg_strings = []
-        has_username_field = False
-        has_password_field = False
         
-        # First pass to check if username or password fields exist in the schema
-        for arg in field_info["args"]:
-            if arg["name"] == "username":
-                has_username_field = True
-            elif arg["name"] == "password":
-                has_password_field = True
-                
-        # Second pass to build argument strings
+        # Build argument strings
         for arg in field_info["args"]:
             if arg["name"] == arg_name:
                 # This is the argument we're testing - use the payload
@@ -139,14 +130,7 @@ class InjectionTester(VulnerabilityTester):
                     arg_strings.append(f'{arg["name"]}: true')
                 else:
                     arg_strings.append(f'{arg["name"]}: "test"')
-        
-        # Always add username and password to every request if they're not already in the args
-        # and not the current argument being tested
-        if not has_username_field and arg_name != "username":
-            arg_strings.append(f'username: "{self.username}"')
-        if not has_password_field and arg_name != "password":
-            arg_strings.append(f'password: "{self.password}"')
-                
+                    
         args_str = ", ".join(arg_strings)
         
         # Define common field selections for different types
@@ -210,7 +194,7 @@ class InjectionTester(VulnerabilityTester):
                 return True, detail, duration
                 
         return False, None, duration
-    
+
     async def scan_field(self, field_name: str, is_mutation: bool = False) -> List[Finding]:
         """
         Scan a specific field for command injection vulnerabilities.
