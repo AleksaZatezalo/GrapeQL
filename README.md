@@ -23,7 +23,7 @@ To install GrapeQL directly from the source code:
 
 ```bash
 # Clone the repository
-git clone https://github.com/zatezalo/grapeql.git
+git clone https://github.com/AleksaZatezalo/grapeql.git
 
 # Navigate to the project directory
 cd grapeql

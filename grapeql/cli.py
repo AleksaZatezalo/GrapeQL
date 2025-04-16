@@ -52,6 +52,9 @@ Examples:
   
   # Test with specific injection credentials
   python -m grapeql --api https://example.com/graphql --username test_user --password test_pass
+  
+  # Use multiple cookies
+  python -m grapeql --api https://example.com/graphql --cookie "session:abc123" --cookie "csrftoken:xyz456"
             """
         )
         
@@ -87,10 +90,12 @@ Examples:
             default="Bearer"
         )
         
-        # Cookie
+        # Cookie - modified to accept multiple cookies
         parser.add_argument(
             "--cookie",
-            help="Cookie in format 'name:value'",
+            help="Cookie in format 'name:value' (can be used multiple times)",
+            action="append",
+            default=[]
         )
         
         # Reporting options
@@ -142,16 +147,21 @@ Examples:
         if args.auth:
             client.set_authorization(args.auth, args.auth_type)
         
-        # Set cookie if provided
+        # Set cookies if provided - updated to handle multiple cookies
         if args.cookie:
-            try:
-                name, value = args.cookie.split(":", 1)
-                client.set_cookie(name.strip(), value.strip())
-            except ValueError:
-                self.printer.print_msg(
-                    f"Invalid cookie format: {args.cookie}. Expected 'name:value'",
-                    status="error"
-                )
+            for cookie_str in args.cookie:
+                try:
+                    name, value = cookie_str.split(":", 1)
+                    client.set_cookie(name.strip(), value.strip())
+                    self.printer.print_msg(
+                        f"Set cookie {name.strip()}: {value.strip()}",
+                        status="success"
+                    )
+                except ValueError:
+                    self.printer.print_msg(
+                        f"Invalid cookie format: {cookie_str}. Expected 'name:value'",
+                        status="error"
+                    )
     
     async def main(self):
         """

@@ -1,7 +1,7 @@
 # GrapeQL Security Assessment Report
 
 ## Target: http://127.0.0.1:5013/graphql
-## Date: 2025-04-16 01:36:07
+## Date: 2025-04-16 20:57:00
 
 ## Executive Summary
 
@@ -11,17 +11,31 @@ GrapeQL conducted a security assessment of the GraphQL API at http://127.0.0.1:5
 
 | Severity | Count |
 |----------|-------|
-| CRITICAL | 1 |
-| HIGH | 5 |
+| CRITICAL | 2 |
+| HIGH | 0 |
 | MEDIUM | 2 |
 | LOW | 2 |
 | INFO | 1 |
 
-Total: 11 findings
+Total: 7 findings
 
 ## Detailed Findings
 
-### 1. Command Injection in systemDiagnostics.cmd
+### 1. SQL Injection in pastes.filter
+
+**Severity:** CRITICAL
+
+**Endpoint:** http://127.0.0.1:5013/graphql
+
+**Description:** Possible SQL injection in pastes.filter with payload: " OR ""="
+
+**Impact:** Database access, extraction of sensitive data, authentication bypass, and potential complete system compromise
+
+**Remediation:** Use parameterized queries, implement proper input validation, and ensure ORM sanitization is correctly applied
+
+---
+
+### 2. Command Injection in systemDiagnostics.cmd
 
 **Severity:** CRITICAL
 
@@ -35,77 +49,7 @@ Total: 11 findings
 
 ---
 
-### 2. DoS Vulnerability: Circular Query DoS
-
-**Severity:** HIGH
-
-**Endpoint:** http://127.0.0.1:5013/graphql
-
-**Description:** The GraphQL endpoint is vulnerable to denial of service through circular query dos. Response time: 11.00 seconds.
-
-**Impact:** Server resources can be exhausted, potentially causing service outages
-
-**Remediation:** Implement query depth limiting, timeout controls, and query cost analysis
-
----
-
-### 3. DoS Vulnerability: Field Duplication DoS
-
-**Severity:** HIGH
-
-**Endpoint:** http://127.0.0.1:5013/graphql
-
-**Description:** The GraphQL endpoint is vulnerable to denial of service through field duplication dos. Response time: 10.98 seconds.
-
-**Impact:** Server resources can be exhausted, potentially causing service outages
-
-**Remediation:** Implement query depth limiting, timeout controls, and query cost analysis
-
----
-
-### 4. DoS Vulnerability: Deeply Nested Query DoS
-
-**Severity:** HIGH
-
-**Endpoint:** http://127.0.0.1:5013/graphql
-
-**Description:** The GraphQL endpoint is vulnerable to denial of service through deeply nested query dos. Response time: 10.99 seconds.
-
-**Impact:** Server resources can be exhausted, potentially causing service outages
-
-**Remediation:** Implement query depth limiting, timeout controls, and query cost analysis
-
----
-
-### 5. DoS Vulnerability: Fragment Bomb DoS
-
-**Severity:** HIGH
-
-**Endpoint:** http://127.0.0.1:5013/graphql
-
-**Description:** The GraphQL endpoint is vulnerable to denial of service through fragment bomb dos. Response time: 10.99 seconds.
-
-**Impact:** Server resources can be exhausted, potentially causing service outages
-
-**Remediation:** Implement query depth limiting, timeout controls, and query cost analysis
-
----
-
-### 6. DoS Vulnerability: Array Batching Attack
-
-**Severity:** HIGH
-
-**Endpoint:** http://127.0.0.1:5013/graphql
-
-**Description:** The GraphQL endpoint is vulnerable to denial of service through array batching. Response time: 11.00 seconds.
-
-**Impact:** Server resources can be exhausted by sending many queries in a single request
-
-**Remediation:** Limit the number of operations allowed in a batch request
-
----
-
-### 7. URL-encoded POST Queries Enabled (Possible CSRF)
+### 3. URL-encoded POST Queries Enabled (Possible CSRF)
 
 **Severity:** MEDIUM
 
@@ -119,7 +63,7 @@ Total: 11 findings
 
 ---
 
-### 8. Introspection Enabled
+### 4. Introspection Enabled
 
 **Severity:** MEDIUM
 
@@ -133,7 +77,7 @@ Total: 11 findings
 
 ---
 
-### 9. Field Suggestions Enabled
+### 5. Field Suggestions Enabled
 
 **Severity:** LOW
 
@@ -147,7 +91,7 @@ Total: 11 findings
 
 ---
 
-### 10. Query Batching Enabled
+### 6. Query Batching Enabled
 
 **Severity:** LOW
 
@@ -161,7 +105,7 @@ Total: 11 findings
 
 ---
 
-### 11. GraphQL Engine Identified: Graphene
+### 7. GraphQL Engine Identified: Graphene
 
 **Severity:** INFO
 
@@ -207,24 +151,15 @@ Applies to:
 
 - Query Batching Enabled
 
+### Use parameterized queries, implement proper input validation, and ensure ORM sanitization is correctly applied
+
+Applies to:
+
+- SQL Injection in pastes.filter
+
 ### Implement proper input validation, use parameterized queries, avoid passing user input to shell commands, and apply the principle of least privilege
 
 Applies to:
 
 - Command Injection in systemDiagnostics.cmd
-
-### Implement query depth limiting, timeout controls, and query cost analysis
-
-Applies to:
-
-- DoS Vulnerability: Circular Query DoS
-- DoS Vulnerability: Field Duplication DoS
-- DoS Vulnerability: Deeply Nested Query DoS
-- DoS Vulnerability: Fragment Bomb DoS
-
-### Limit the number of operations allowed in a batch request
-
-Applies to:
-
-- DoS Vulnerability: Array Batching Attack
 
