@@ -11,6 +11,7 @@ import time
 from typing import Dict, List, Optional, Tuple, Any
 from .tester import VulnerabilityTester
 from .utils import Finding
+from .client import GraphQLClient
 
 class DosTester(VulnerabilityTester):
     """
@@ -25,18 +26,19 @@ class DosTester(VulnerabilityTester):
         self.types = {}
         self.query_type = None
         
-    async def setup_endpoint(self, endpoint: str, proxy: Optional[str] = None) -> bool:
+    async def setup_endpoint(self, endpoint: str, proxy: Optional[str] = None, pre_configured_client: Optional[GraphQLClient] = None) -> bool:
         """
         Set up the testing environment with the target endpoint.
         
         Args:
             endpoint: GraphQL endpoint URL
             proxy: Optional proxy in host:port format
+            pre_configured_client: Optional pre-configured client with cookies, auth tokens, etc.
             
         Returns:
             bool: True if setup was successful
         """
-        result = await super().setup_endpoint(endpoint, proxy)
+        result = await super().setup_endpoint(endpoint, proxy, pre_configured_client)
         
         if result and self.client.schema:
             # Process schema into a more usable format for DoS testing

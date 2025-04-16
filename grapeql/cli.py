@@ -183,24 +183,60 @@ Examples:
             # Run all tests on the endpoint
             self.printer.print_section(f"Testing endpoint: {args.api}")
             
+            # Create a temporary client to set cookies and auth before introspection
+            temp_client = GraphQLClient()
+            temp_client.set_endpoint(args.api)
+            
+            # Set proxy if provided
+            if args.proxy:
+                try:
+                    proxy_host, proxy_port = args.proxy.split(":")
+                    temp_client.configure_proxy(proxy_host, int(proxy_port))
+                except ValueError:
+                    self.printer.print_msg(
+                        f"Invalid proxy format: {args.proxy}. Expected host:port",
+                        status="error"
+                    )
+            
+            # Apply auth and cookies before any introspection query
+            if args.auth:
+                temp_client.set_authorization(args.auth, args.auth_type)
+                
+            if args.cookie:
+                for cookie_str in args.cookie:
+                    try:
+                        name, value = cookie_str.split(":", 1)
+                        temp_client.set_cookie(name.strip(), value.strip())
+                        self.printer.print_msg(
+                            f"Set cookie {name.strip()}: {value.strip()}",
+                            status="success"
+                        )
+                    except ValueError:
+                        self.printer.print_msg(
+                            f"Invalid cookie format: {cookie_str}. Expected 'name:value'",
+                            status="error"
+                        )
+                        
+            # Pass the configured client to setup_endpoint calls to use for initial introspection
+            
             # Fingerprinting
             fingerprinter = Fingerprinter()
-            if await fingerprinter.setup_endpoint(args.api, args.proxy):
-                self.setup_client(fingerprinter.client, args)
+            if await fingerprinter.setup_endpoint(args.api, args.proxy, temp_client):
+                # No need to set up again, client is already configured
                 await fingerprinter.fingerprint()
                 self.reporter.add_findings(fingerprinter.get_findings())
             
             # Information disclosure tests
             info_tester = InfoTester()
-            if await info_tester.setup_endpoint(args.api, args.proxy):
-                self.setup_client(info_tester.client, args)
+            if await info_tester.setup_endpoint(args.api, args.proxy, temp_client):
+                # No need to call setup_client again
                 await info_tester.run_test()
                 self.reporter.add_findings(info_tester.get_findings())
             
             # Command injection tests
             injection_tester = InjectionTester()
-            if await injection_tester.setup_endpoint(args.api, args.proxy):
-                self.setup_client(injection_tester.client, args)
+            if await injection_tester.setup_endpoint(args.api, args.proxy, temp_client):
+                # No need to call setup_client again
                 
                 # Set custom credentials for injection testing if provided
                 if args.username or args.password:
@@ -222,8 +258,8 @@ Examples:
                     status="warning"
                 )
                 dos_tester = DosTester()
-                if await dos_tester.setup_endpoint(args.api, args.proxy):
-                    self.setup_client(dos_tester.client, args)
+                if await dos_tester.setup_endpoint(args.api, args.proxy, temp_client):
+                    # No need to call setup_client again
                     await dos_tester.run_test()
                     self.reporter.add_findings(dos_tester.get_findings())
             else:

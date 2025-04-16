@@ -137,17 +137,34 @@ class Fingerprinter:
             }
         }
         
-    async def setup_endpoint(self, endpoint: str, proxy: Optional[str] = None) -> bool:
+    async def setup_endpoint(self, endpoint: str, proxy: Optional[str] = None, pre_configured_client: Optional[GraphQLClient] = None) -> bool:
         """
         Set up the fingerprinter with the target endpoint.
         
         Args:
             endpoint: GraphQL endpoint URL
             proxy: Optional proxy in host:port format
+            pre_configured_client: Optional pre-configured client with cookies, auth tokens, etc.
             
         Returns:
             bool: True if setup was successful
         """
+        if pre_configured_client:
+            # Copy all relevant properties from the pre-configured client
+            self.client.endpoint = pre_configured_client.endpoint
+            self.client.proxy_url = pre_configured_client.proxy_url
+            self.client.headers = pre_configured_client.headers.copy()
+            self.client.cookies = pre_configured_client.cookies.copy()
+            self.client.auth_token = pre_configured_client.auth_token
+            self.client.schema = pre_configured_client.schema
+            self.client.query_fields = pre_configured_client.query_fields.copy() if pre_configured_client.query_fields else {}
+            self.client.mutation_fields = pre_configured_client.mutation_fields.copy() if pre_configured_client.mutation_fields else {}
+            
+            # If the pre-configured client already has schema data, consider setup successful
+            if pre_configured_client.schema:
+                return True
+                
+        # Proceed with normal setup if no pre-configured client or it has no schema
         return await self.client.setup_endpoint(endpoint, proxy)
         
     def _error_contains(self, response: Dict, error_text: str, part: str = "message") -> bool:

@@ -1,7 +1,7 @@
 # GrapeQL Security Assessment Report
 
 ## Target: http://127.0.0.1:5013/graphql
-## Date: 2025-04-16 20:57:00
+## Date: 2025-04-16 21:12:08
 
 ## Executive Summary
 
