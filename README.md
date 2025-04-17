@@ -28,7 +28,7 @@ git clone https://github.com/AleksaZatezalo/grapeql.git
 # Navigate to the project directory
 cd grapeql
 
-# Or install for regular use
+# Install for regular use
 pip install .
 ```
 
