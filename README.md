@@ -257,9 +257,10 @@ injection_tester.set_credentials("admin", "p@ssw0rd")
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-## License
+## Donation Link
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+If you have benefited from this project and use Monero please consider donanting to the following address:
+47RoH3K4j8STLSh8ZQ2vUXZdh7GTK6dBy7uEBopegzkp6kK4fBrznkKjE3doTamn3W7A5DHbWXNdjaz2nbZmSmAk8X19ezQ
 
 ## Author
 
