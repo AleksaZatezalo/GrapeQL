@@ -29,7 +29,7 @@ git clone https://github.com/AleksaZatezalo/grapeql.git
 cd grapeql
 
 # Install for regular use
-pip install .
+pip install -e .
 ```
 
 This method is useful for accessing the latest features or if you want to contribute to the development.
@@ -40,7 +40,7 @@ GrapeQL comes with a powerful command-line interface for quick security assessme
 
 ```bash
 # Basic GraphQL endpoint test
-python -m grapeql --api https://example.com/graphql
+grapeql --api https://example.com/graphql
 ```
 
 ### CLI Options
