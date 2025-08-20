@@ -1,0 +1,38 @@
+name: Question
+description: Ask a question about using GrapeQL
+title: "[Question]: "
+labels: ["question", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please search existing issues and check the documentation before asking a question.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What would you like to know?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What are you trying to achieve? What have you tried?
+      placeholder: Describe your use case and what you've attempted so far
+
+  - type: textarea
+    id: relevant-code
+    attributes:
+      label: Relevant Code
+      description: If applicable, include relevant code snippets
+      render: python
+
+  - type: input
+    id: version
+    attributes:
+      label: GrapeQL Version
+      description: What version of GrapeQL are you using?
+      placeholder: "e.g., 1.2.0"
