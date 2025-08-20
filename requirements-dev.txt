@@ -1,0 +1,56 @@
+# Development Dependencies for GrapeQL
+# Install with: pip install -r requirements-dev.txt
+
+# Testing Framework
+pytest>=7.4.0                    # Main testing framework
+pytest-asyncio>=0.21.0           # Async test support
+pytest-cov>=4.1.0               # Coverage reporting
+pytest-mock>=3.11.0             # Enhanced mocking
+pytest-xdist>=3.3.0             # Parallel test execution
+pytest-benchmark>=4.0.0         # Performance testing (optional)
+
+# Code Formatting
+black>=23.7.0                   # Code formatter
+isort>=5.12.0                   # Import sorter
+
+# Linting and Quality
+flake8>=6.0.0                   # Main linter
+flake8-docstrings>=1.7.0        # Docstring linting
+flake8-import-order>=0.18.0     # Import order checking
+flake8-bugbear>=23.7.0          # Bug and design problem finder
+flake8-comprehensions>=3.14.0   # List/dict comprehension improvements
+flake8-simplify>=0.20.0         # Code simplification suggestions
+
+# Type Checking
+mypy>=1.5.0                     # Static type checker
+types-aiohttp>=3.8.0            # Type stubs for aiohttp
+
+# Security
+bandit>=1.7.0                   # Security linter
+safety>=2.3.0                   # Dependency vulnerability scanner
+
+# Documentation
+sphinx>=7.1.0                   # Documentation generator
+sphinx-rtd-theme>=1.3.0         # Read the Docs theme
+sphinx-autodoc-typehints>=1.24.0 # Type hints in docs
+
+# Development Tools
+pre-commit>=3.3.0               # Git hooks manager
+tox>=4.6.0                      # Multi-environment testing
+wheel>=0.41.0                   # For building distributions
+twine>=4.0.0                    # For uploading to PyPI (if needed)
+
+# HTTP Testing (for GraphQL client testing)
+aioresponses>=0.7.4             # Mock aiohttp responses
+responses>=0.23.0               # Mock HTTP requests
+httpx>=0.24.0                   # Alternative HTTP client for testing
+
+# Development Utilities
+ipython>=8.14.0                 # Enhanced REPL
+ipdb>=0.13.0                    # Debugger
+rich>=13.4.0                    # Pretty printing and formatting
+click>=8.1.0                    # CLI development (if needed)
+
+# Performance Profiling (optional)
+memory-profiler>=0.61.0         # Memory usage profiling
+py-spy>=0.3.0                   # Sampling profiler
