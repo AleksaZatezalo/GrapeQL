@@ -62,31 +62,28 @@ grapeql --api https://example.com/graphql
 
 ```bash
 # Basic endpoint test
-python -m grapeql --api https://example.com/graphql
+grapeql --api https://example.com/graphql
 
 # Include DoS testing
-python -m grapeql --api https://example.com/graphql --dos
+grapeql --api https://example.com/graphql --dos
 
 # Use a proxy
-python -m grapeql --api https://example.com/graphql --proxy 127.0.0.1:8080
+grapeql --api https://example.com/graphql --proxy 127.0.0.1:8080
 
 # Add authentication
-python -m grapeql --api https://example.com/graphql --auth "your_token_here" --auth-type Bearer
+grapeql --api https://example.com/graphql --auth "your_token_here" --auth-type Bearer
 
 # Include a session cookie
-python -m grapeql --api https://example.com/graphql --cookie "session:abc123"
+grapeql --api https://example.com/graphql --cookie "session:abc123"
 
 # Generate a markdown report
-python -m grapeql --api https://example.com/graphql --report report.md
+grapeql --api https://example.com/graphql --report report.md
 
 # Generate a JSON report
-python -m grapeql --api https://example.com/graphql --report report.json --report-format json
+grapeql --api https://example.com/graphql --report report.json --report-format json
 
 # Custom injection testing credentials
-python -m grapeql --api https://example.com/graphql --username test_user --password test_pass
-
-# Comprehensive example
-python -m grapeql --api https://example.com/graphql --dos --proxy 127.0.0.1:8080 --auth "token" --cookie "session:value" --report report.md --username admin --password s3cr3t
+grapeql --api https://example.com/graphql --username test_user --password test_pass
 ```
 
 ## Using GrapeQL as a Library
@@ -221,41 +218,6 @@ GrapeQL's modular design includes these key components:
 6. **Reporter**: Generates reports and summaries
 
 Each component can be used independently or combined into custom testing workflows.
-
-## Advanced Configuration
-
-### Using a Proxy
-
-```python
-client = GraphQLClient()
-client.configure_proxy("127.0.0.1", 8080)
-```
-
-### Setting Custom Headers and Cookies
-
-```python
-client = GraphQLClient()
-client.set_header("X-Custom-Header", "value")
-client.set_cookie("session", "cookie-value")
-```
-
-### Authentication
-
-```python
-client = GraphQLClient()
-client.set_authorization("your-token", "Bearer")  # Default is Bearer
-```
-
-### Custom Injection Testing Credentials
-
-```python
-injection_tester = InjectionTester()
-injection_tester.set_credentials("admin", "p@ssw0rd")
-```
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Author
 
