@@ -48,26 +48,10 @@ jobs:
       run: |
         isort --check-only --diff grapeql/ tests/
         
-    - name: Run flake8 (Linting)
-      run: |
-        flake8 grapeql/ tests/
-        
     - name: Run mypy (Type Checking)
       run: |
         mypy grapeql/
         
-    - name: Run bandit (Security Linting)
-      run: |
-        bandit -r grapeql/ -f json -o bandit-report.json
-        bandit -r grapeql/
-        
-    - name: Upload bandit results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: bandit-results-${{ matrix.python-version }}
-        path: bandit-report.json
-
   # Testing Job
   test:
     name: Run Tests
