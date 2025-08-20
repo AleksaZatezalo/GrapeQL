@@ -9,6 +9,7 @@ Description: Utility functions and classes for GrapeQL
 import time
 from typing import Dict, List, Optional, Any, Union
 
+
 class GrapePrinter:
     """
     A class for handling colored console output formatting for the GrapeQL tool.
@@ -106,33 +107,35 @@ class GrapePrinter:
         self.print_title()
         self.print_notify()
 
-    def print_vulnerability(self, title: str, severity: str, details: Optional[str] = None):
+    def print_vulnerability(
+        self, title: str, severity: str, details: Optional[str] = None
+    ):
         """
         Print a formatted vulnerability finding.
-        
+
         Args:
             title: The vulnerability title
             severity: Severity level (LOW, MEDIUM, HIGH, CRITICAL)
             details: Optional details about the vulnerability
         """
         severity = severity.upper()
-        
+
         if severity == "HIGH" or severity == "CRITICAL":
             color = self.RED
         elif severity == "MEDIUM":
             color = self.YELLOW
         else:
             color = self.BLUE
-            
+
         print(f"\n{color}{self.BOLD}[{severity}] {title}{self.END}")
-        
+
         if details:
             print(f"  {details}")
-            
+
     def print_section(self, title: str):
         """
         Print a section header.
-        
+
         Args:
             title: Section title
         """
@@ -143,7 +146,7 @@ class Finding:
     """
     Represents a security finding/vulnerability with standardized attributes.
     """
-    
+
     def __init__(
         self,
         title: str,
@@ -151,11 +154,11 @@ class Finding:
         description: str,
         endpoint: str,
         impact: Optional[str] = None,
-        remediation: Optional[str] = None
+        remediation: Optional[str] = None,
     ):
         """
         Initialize a new finding.
-        
+
         Args:
             title: Title of the finding
             severity: Severity level (LOW, MEDIUM, HIGH, CRITICAL)
@@ -171,7 +174,7 @@ class Finding:
         self.impact = impact
         self.remediation = remediation
         self.timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-        
+
     def to_dict(self) -> Dict:
         """Convert finding to dictionary representation."""
         return {
@@ -181,9 +184,9 @@ class Finding:
             "endpoint": self.endpoint,
             "impact": self.impact,
             "remediation": self.remediation,
-            "timestamp": self.timestamp
+            "timestamp": self.timestamp,
         }
-    
+
     def __str__(self) -> str:
         """String representation of the finding."""
         return f"{self.severity} - {self.title} - {self.endpoint}"
@@ -192,15 +195,15 @@ class Finding:
 def load_wordlist(path: str) -> List[str]:
     """
     Load a wordlist file into a list of strings.
-    
+
     Args:
         path: Path to wordlist file
-        
+
     Returns:
         List[str]: Lines from the wordlist file
     """
     try:
-        with open(path, 'r') as f:
+        with open(path, "r") as f:
             return [line.strip() for line in f if line.strip()]
     except Exception as e:
         print(f"Error loading wordlist from {path}: {str(e)}")
@@ -210,16 +213,17 @@ def load_wordlist(path: str) -> List[str]:
 def load_json_file(path: str) -> Optional[Dict]:
     """
     Load and parse a JSON file.
-    
+
     Args:
         path: Path to JSON file
-        
+
     Returns:
         Optional[Dict]: Parsed JSON data or None on error
     """
     try:
-        with open(path, 'r') as f:
+        with open(path, "r") as f:
             import json
+
             return json.load(f)
     except Exception as e:
         print(f"Error loading JSON from {path}: {str(e)}")

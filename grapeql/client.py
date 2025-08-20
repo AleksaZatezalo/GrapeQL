@@ -12,6 +12,7 @@ import json
 from typing import Dict, List, Optional, Any, Tuple, Union
 from .utils import GrapePrinter
 
+
 class GraphQLClient:
     """
     Unified HTTP client for all GrapeQL modules providing consistent
@@ -35,7 +36,7 @@ class GraphQLClient:
     def configure_proxy(self, proxy_host: str, proxy_port: int) -> None:
         """
         Configure HTTP proxy settings.
-        
+
         Args:
             proxy_host: Proxy server hostname or IP
             proxy_port: Proxy server port
@@ -46,7 +47,7 @@ class GraphQLClient:
     def set_endpoint(self, endpoint: str) -> None:
         """
         Set the GraphQL endpoint URL.
-        
+
         Args:
             endpoint: The GraphQL endpoint URL
         """
@@ -56,7 +57,7 @@ class GraphQLClient:
     def set_header(self, name: str, value: str) -> None:
         """
         Set a custom header.
-        
+
         Args:
             name: Header name
             value: Header value
@@ -67,7 +68,7 @@ class GraphQLClient:
     def set_headers(self, headers: Dict[str, str]) -> None:
         """
         Set multiple custom headers.
-        
+
         Args:
             headers: Dictionary of header name/value pairs
         """
@@ -77,7 +78,7 @@ class GraphQLClient:
     def set_cookie(self, name: str, value: str) -> None:
         """
         Set a cookie.
-        
+
         Args:
             name: Cookie name
             value: Cookie value
@@ -88,7 +89,7 @@ class GraphQLClient:
     def set_cookies(self, cookies: Dict[str, str]) -> None:
         """
         Set multiple cookies.
-        
+
         Args:
             cookies: Dictionary of cookie name/value pairs
         """
@@ -98,14 +99,16 @@ class GraphQLClient:
     def set_authorization(self, token: str, prefix: str = "Bearer") -> None:
         """
         Set Authorization header.
-        
+
         Args:
             token: Authorization token
             prefix: Token type prefix (default: "Bearer")
         """
         self.headers["Authorization"] = f"{prefix} {token}" if prefix else token
         self.auth_token = token
-        self.printer.print_msg(f"Set authorization token with prefix '{prefix}'", status="success")
+        self.printer.print_msg(
+            f"Set authorization token with prefix '{prefix}'", status="success"
+        )
 
     def clear_headers(self) -> None:
         """Reset headers to default state."""
@@ -120,7 +123,7 @@ class GraphQLClient:
     def generate_curl(self) -> str:
         """
         Generate curl command from last request for debugging and reporting.
-        
+
         Returns:
             str: curl command that reproduces the last request
         """
@@ -149,19 +152,16 @@ class GraphQLClient:
         return " ".join(command)
 
     async def make_request(
-        self, 
-        method: str, 
-        url: Optional[str] = None, 
-        **kwargs
+        self, method: str, url: Optional[str] = None, **kwargs
     ) -> Tuple[Optional[Dict], Optional[str]]:
         """
         Make a generic HTTP request with consistent error handling.
-        
+
         Args:
             method: HTTP method (GET, POST, etc.)
             url: URL to request (uses self.endpoint if None)
             **kwargs: Additional arguments to pass to aiohttp request
-        
+
         Returns:
             Tuple[Optional[Dict], Optional[str]]: Tuple of (response JSON, error message)
         """
@@ -169,27 +169,29 @@ class GraphQLClient:
             error_msg = "No endpoint URL provided"
             self.printer.print_msg(error_msg, status="error")
             return None, error_msg
-            
+
         target_url = url or self.endpoint
-        
+
         # Prepare request kwargs with defaults
         request_kwargs = {
             "headers": self.headers,
             "cookies": self.cookies,
             "proxy": self.proxy_url,
             "ssl": False,  # Required for intercepting HTTPS
-            "timeout": self.timeout
+            "timeout": self.timeout,
         }
-        
+
         # Update with any additional kwargs
         request_kwargs.update(kwargs)
-        
+
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.request(method, target_url, **request_kwargs) as response:
+                async with session.request(
+                    method, target_url, **request_kwargs
+                ) as response:
                     self.last_response = response
-                    
-                    if response.content_type == 'application/json':
+
+                    if response.content_type == "application/json":
                         result = await response.json()
                         return result, None
                     else:
@@ -200,7 +202,7 @@ class GraphQLClient:
                         except json.JSONDecodeError:
                             # If it's not JSON, return the text
                             return {"text": text}, None
-                            
+
         except asyncio.TimeoutError:
             error_msg = f"Request to {target_url} timed out"
             self.printer.print_msg(error_msg, status="error")
@@ -211,19 +213,19 @@ class GraphQLClient:
             return None, error_msg
 
     async def graphql_query(
-        self, 
-        query: str, 
-        variables: Optional[Dict] = None, 
-        operation_name: Optional[str] = None
+        self,
+        query: str,
+        variables: Optional[Dict] = None,
+        operation_name: Optional[str] = None,
     ) -> Tuple[Optional[Dict], Optional[str]]:
         """
         Execute a GraphQL query with proper formatting.
-        
+
         Args:
             query: GraphQL query string
             variables: Optional dictionary of variables
             operation_name: Optional operation name
-            
+
         Returns:
             Tuple[Optional[Dict], Optional[str]]: Tuple of (response data, error message)
         """
@@ -231,36 +233,36 @@ class GraphQLClient:
             error_msg = "No GraphQL endpoint set"
             self.printer.print_msg(error_msg, status="error")
             return None, error_msg
-            
+
         payload = {"query": query}
-        
+
         if variables:
             payload["variables"] = variables
-            
+
         if operation_name:
             payload["operationName"] = operation_name
-            
+
         response, error = await self.make_request("POST", json=payload)
-        
+
         if error:
             return None, error
-            
+
         # Extract and format any GraphQL errors
         if response and "errors" in response:
             error_msgs = []
             for error in response.get("errors", []):
                 error_msgs.append(error.get("message", "Unknown GraphQL error"))
-                
+
             if error_msgs:
                 error_str = "; ".join(error_msgs)
                 # Don't return error as response might still contain partial data
-        
+
         return response, None
 
     async def introspection_query(self) -> bool:
         """
         Run introspection query to validate the GraphQL endpoint and cache schema info.
-        
+
         Returns:
             bool: True if introspection succeeded
         """
@@ -321,69 +323,71 @@ class GraphQLClient:
         """
 
         response, error = await self.graphql_query(query)
-        
+
         if error or not response:
-            self.printer.print_msg("Introspection failed - endpoint might not be GraphQL", status="failed")
+            self.printer.print_msg(
+                "Introspection failed - endpoint might not be GraphQL", status="failed"
+            )
             return False
-            
+
         schema_data = response.get("data", {}).get("__schema")
-        
+
         if not schema_data:
-            self.printer.print_msg("Introspection failed - no schema data returned", status="failed")
+            self.printer.print_msg(
+                "Introspection failed - no schema data returned", status="failed"
+            )
             return False
-            
+
         # Cache the schema
         self.schema = schema_data
-        
+
         # Process and store query fields
         if schema_data.get("queryType"):
             for field in schema_data["queryType"].get("fields", []):
-                self.query_fields[field["name"]] = {
-                    "args": field.get("args", [])
-                }
+                self.query_fields[field["name"]] = {"args": field.get("args", [])}
 
         # Process and store mutation fields
         if schema_data.get("mutationType"):
             for field in schema_data["mutationType"].get("fields", []):
-                self.mutation_fields[field["name"]] = {
-                    "args": field.get("args", [])
-                }
-                
+                self.mutation_fields[field["name"]] = {"args": field.get("args", [])}
+
         self.printer.print_msg("Introspection successful", status="success")
         return True
 
     async def setup_endpoint(self, endpoint: str, proxy: Optional[str] = None) -> bool:
         """
         Set the endpoint, configure proxy if provided, and run introspection.
-        
+
         Args:
             endpoint: The GraphQL endpoint URL
             proxy: Optional proxy string in format "host:port"
-            
+
         Returns:
             bool: True if endpoint was set and schema retrieved successfully
         """
         self.set_endpoint(endpoint)
-        
+
         if proxy:
             try:
                 proxy_host, proxy_port = proxy.split(":")
                 self.configure_proxy(proxy_host, int(proxy_port))
             except ValueError:
-                self.printer.print_msg("Invalid proxy format. Expected host:port", status="error")
+                self.printer.print_msg(
+                    "Invalid proxy format. Expected host:port", status="error"
+                )
                 return False
-                
+
         return await self.introspection_query()
 
     # For testing connectivity with both direct socket and HTTP
     async def test_connectivity(self, host: str, port: int) -> bool:
         """
         Test connectivity to a target server.
-        
+
         Args:
             host: Target hostname or IP
             port: Target port
-            
+
         Returns:
             bool: True if connection succeeded
         """
@@ -396,7 +400,7 @@ class GraphQLClient:
             return True
         except Exception:
             pass
-            
+
         # If socket fails, try HTTP request
         try:
             test_url = f"http://{host}:{port}"

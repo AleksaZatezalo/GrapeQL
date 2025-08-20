@@ -15,18 +15,18 @@ from .dos_tester import DosTester
 from .info_tester import InfoTester
 from .reporter import Reporter
 
-__version__ = '2.0.0'
-__author__ = 'Aleksa Zatezalo'
+__version__ = "2.0.0"
+__author__ = "Aleksa Zatezalo"
 __all__ = [
-    'GrapePrinter',
-    'Finding',
-    'GraphQLClient',
-    'Fingerprinter',
-    'VulnerabilityTester',
-    'InjectionTester',
-    'DosTester',
-    'InfoTester',
-    'Reporter'
+    "GrapePrinter",
+    "Finding",
+    "GraphQLClient",
+    "Fingerprinter",
+    "VulnerabilityTester",
+    "InjectionTester",
+    "DosTester",
+    "InfoTester",
+    "Reporter",
 ]
 
 # Export main function for CLI usage

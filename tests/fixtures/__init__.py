@@ -1,4 +1,3 @@
-
 """
 Test fixtures for GrapeQL testing
 """
