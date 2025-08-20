@@ -1,3 +1,8 @@
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/AleksaZatezalo/GrapeQL/ci.yml?branch=main)](https://github.com/AleksaZatezalo/GrapeQL/actions)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
 # GrapeQL
 
 A comprehensive GraphQL security testing tool for detecting vulnerabilities in GraphQL APIs.
