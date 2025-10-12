@@ -9,6 +9,8 @@ Description: CLI for GrapeQL GraphQL Security Testing Tool
 import asyncio
 import argparse
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional
 
 from .utils import GrapePrinter
@@ -29,6 +31,9 @@ class GrapeQL:
         """Initialize the GrapeQL CLI."""
         self.printer = GrapePrinter()
         self.reporter = Reporter()
+
+        self.printer_lock = threading.Lock()
+        self.reporter_lock = threading.Lock()
 
     def parse_arguments(self):
         """
@@ -211,39 +216,55 @@ Examples:
 
             # Pass the configured client to setup_endpoint calls to use for initial introspection
 
-            # Fingerprinting
-            fingerprinter = Fingerprinter()
-            if await fingerprinter.setup_endpoint(args.api, args.proxy, temp_client):
-                # No need to set up again, client is already configured
-                await fingerprinter.fingerprint()
-                self.reporter.add_findings(fingerprinter.get_findings())
+            async def run_fingerprint_test():
+                fingerprinter = Fingerprinter()
+                if await fingerprinter.setup_endpoint(args.api, args.proxy, temp_client):
+                    await fingerprinter.fingerprint()
+                    with self.reporter_lock:
+                        self.reporter.add_findings(fingerprinter.get_findings())
 
-            # Information disclosure tests
-            info_tester = InfoTester()
-            if await info_tester.setup_endpoint(args.api, args.proxy, temp_client):
-                # No need to call setup_client again
-                await info_tester.run_test()
-                self.reporter.add_findings(info_tester.get_findings())
+            async def run_info_test():
+                info_tester = InfoTester()
+                if await info_tester.setup_endpoint(args.api, args.proxy, temp_client):
+                    await info_tester.run_test()
+                    with self.reporter_lock:
+                        self.reporter.add_findings(info_tester.get_findings())
 
-            # Command injection tests
-            injection_tester = InjectionTester()
-            if await injection_tester.setup_endpoint(args.api, args.proxy, temp_client):
-                # No need to call setup_client again
+            async def run_injection_test():
+                injection_tester = InjectionTester()
+                if await injection_tester.setup_endpoint(args.api, args.proxy, temp_client):
+                    if args.username or args.password:
+                        username = args.username or "admin"
+                        password = args.password or "changeme"
+                        injection_tester.set_credentials(username, password)
+                        with self.printer_lock:
+                            self.printer.print_msg(
+                                f"Using custom injection testing credentials: {username}:{password}",
+                                status="log",
+                            )
+                    await injection_tester.run_test()
+                    with self.reporter_lock:
+                        self.reporter.add_findings(injection_tester.get_findings())
 
-                # Set custom credentials for injection testing if provided
-                if args.username or args.password:
-                    username = args.username or "admin"  # Use default if not provided
-                    password = (
-                        args.password or "changeme"
-                    )  # Use default if not provided
-                    injection_tester.set_credentials(username, password)
-                    self.printer.print_msg(
-                        f"Using custom injection testing credentials: {username}:{password}",
-                        status="log",
-                    )
 
-                await injection_tester.run_test()
-                self.reporter.add_findings(injection_tester.get_findings())
+            def run_async_test(coro):
+                return asyncio.run(coro())
+
+            with ThreadPoolExecutor(max_workers=3) as executor:
+                
+                test_futures = [
+                    executor.submit(run_async_test, run_fingerprint_test),
+                    executor.submit(run_async_test, run_info_test),
+                    executor.submit(run_async_test, run_injection_test),
+                ]
+                
+                # Wait for all tests to complete
+                for future in test_futures:
+                    try:
+                        future.result()
+                    except Exception as e:
+                        with self.printer_lock:
+                            self.printer.print_msg(f"Error during test execution: {str(e)}", status="error")
 
             # DoS tests - only run if the --dos flag is provided
             if args.dos:
