@@ -218,7 +218,9 @@ Examples:
 
             async def run_fingerprint_test():
                 fingerprinter = Fingerprinter()
-                if await fingerprinter.setup_endpoint(args.api, args.proxy, temp_client):
+                if await fingerprinter.setup_endpoint(
+                    args.api, args.proxy, temp_client
+                ):
                     await fingerprinter.fingerprint()
                     with self.reporter_lock:
                         self.reporter.add_findings(fingerprinter.get_findings())
@@ -232,7 +234,9 @@ Examples:
 
             async def run_injection_test():
                 injection_tester = InjectionTester()
-                if await injection_tester.setup_endpoint(args.api, args.proxy, temp_client):
+                if await injection_tester.setup_endpoint(
+                    args.api, args.proxy, temp_client
+                ):
                     if args.username or args.password:
                         username = args.username or "admin"
                         password = args.password or "changeme"
@@ -246,25 +250,26 @@ Examples:
                     with self.reporter_lock:
                         self.reporter.add_findings(injection_tester.get_findings())
 
-
             def run_async_test(coro):
                 return asyncio.run(coro())
 
             with ThreadPoolExecutor(max_workers=3) as executor:
-                
+
                 test_futures = [
                     executor.submit(run_async_test, run_fingerprint_test),
                     executor.submit(run_async_test, run_info_test),
                     executor.submit(run_async_test, run_injection_test),
                 ]
-                
+
                 # Wait for all tests to complete
                 for future in test_futures:
                     try:
                         future.result()
                     except Exception as e:
                         with self.printer_lock:
-                            self.printer.print_msg(f"Error during test execution: {str(e)}", status="error")
+                            self.printer.print_msg(
+                                f"Error during test execution: {str(e)}", status="error"
+                            )
 
             # DoS tests - only run if the --dos flag is provided
             if args.dos:
