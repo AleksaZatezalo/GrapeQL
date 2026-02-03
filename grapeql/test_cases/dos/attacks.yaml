@@ -1,0 +1,62 @@
+# GrapeQL DoS Attack Test Cases
+#
+# Each entry configures a DoS technique. The dos_tester uses these
+# to generate schema-aware queries. The "generator" field tells the
+# tester which built-in generator method to call.
+
+test_cases:
+  - name: circular_query
+    title: "Circular Query DoS"
+    generator: generate_circular_query
+    description: "Deeply nested circular query exploiting type self-references"
+    severity: HIGH
+    impact: "Server resources can be exhausted, potentially causing service outages"
+    remediation: "Implement query depth limiting, timeout controls, and query cost analysis"
+    # How many nesting levels to generate
+    depth: 10
+    # How many times to duplicate the top-level fragment
+    duplicates: 3
+
+  - name: field_duplication
+    title: "Field Duplication DoS"
+    generator: generate_field_duplication
+    description: "Query with massively duplicated scalar fields"
+    severity: HIGH
+    impact: "Server resources can be exhausted by resolving the same field thousands of times"
+    remediation: "Implement query depth limiting, timeout controls, and query cost analysis"
+    repeat_count: 10000
+
+  - name: deep_nesting
+    title: "Deeply Nested Query DoS"
+    generator: generate_deeply_nested_query
+    description: "Query nested to extreme depth via object-type fields"
+    severity: HIGH
+    impact: "Server resources can be exhausted, potentially causing service outages"
+    remediation: "Implement query depth limiting, timeout controls, and query cost analysis"
+    depth: 100
+
+  - name: fragment_bomb
+    title: "Fragment Bomb DoS"
+    generator: generate_fragment_bomb
+    description: "Query with many fragments that reference each other"
+    severity: HIGH
+    impact: "Server resources can be exhausted parsing/validating fragment chains"
+    remediation: "Implement query depth limiting, timeout controls, and query cost analysis"
+    fragment_count: 50
+
+  - name: array_batching
+    title: "Array Batching DoS"
+    generator: generate_array_batching
+    description: "Batch of many identical queries sent as a single request"
+    severity: HIGH
+    impact: "Server resources can be exhausted by sending many queries in a single request"
+    remediation: "Limit the number of operations allowed in a batch request"
+    batch_size: 1000
+    # Special: this one is sent as a JSON array, not a single query
+    send_as: batch
+
+  # ── Add custom attack patterns below ──────────────────────────
+  # - name: alias_overload
+  #   title: "Alias Overload DoS"
+  #   generator: generate_alias_overload
+  #   ...

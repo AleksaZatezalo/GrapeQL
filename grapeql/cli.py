@@ -1,13 +1,18 @@
 """
 GrapeQL Command Line Interface
 Author: Aleksa Zatezalo
-Version: 2.0
-Date: April 2025
-Description: CLI for GrapeQL GraphQL Security Testing Tool
+Version: 3.0
+Date: February 2025
+Description: CLI for GrapeQL GraphQL Security Testing Tool.
+             New in v3: --log-file, --test-cases, --schema-file flags.
+             Schema is retrieved once (or loaded from file) and forwarded to all modules.
+             Response-time baseline is shared across modules for DoS threshold.
 """
 
 import asyncio
 import argparse
+import json
+import os
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -20,280 +25,250 @@ from .injection_tester import InjectionTester
 from .dos_tester import DosTester
 from .info_tester import InfoTester
 from .reporter import Reporter
+from .logger import GrapeLogger
+from .loader import TestCaseLoader
+from .baseline import BaselineTracker
+
+
+# Resolve the default test_cases directory shipped with the package
+_DEFAULT_TEST_CASES_DIR = os.path.join(os.path.dirname(__file__), "test_cases")
 
 
 class GrapeQL:
     """
-    Main class for the GrapeQL CLI with options.
+    Main class for the GrapeQL CLI.
     """
 
     def __init__(self):
-        """Initialize the GrapeQL CLI."""
         self.printer = GrapePrinter()
         self.reporter = Reporter()
-
         self.printer_lock = threading.Lock()
         self.reporter_lock = threading.Lock()
 
     def parse_arguments(self):
-        """
-        Parse command line arguments with options.
-
-        Returns:
-            argparse.Namespace: Parsed arguments
-        """
         parser = argparse.ArgumentParser(
             description="GrapeQL - GraphQL Security Testing Tool",
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog="""
 Examples:
-  # Test a specific GraphQL endpoint
+  # Basic scan
   python -m grapeql --api https://example.com/graphql
-  
-  # Include DoS testing
-  python -m grapeql --api https://example.com/graphql --dos
-  
-  # Generate a report
-  python -m grapeql --api https://example.com/graphql --report report.md
-  
-  # Test with specific injection credentials
-  python -m grapeql --api https://example.com/graphql --username test_user --password test_pass
-  
-  # Use multiple cookies
-  python -m grapeql --api https://example.com/graphql --cookie "session:abc123" --cookie "csrftoken:xyz456"
+
+  # Full scan with DoS, logging, and custom test cases
+  python -m grapeql --api https://example.com/graphql \\
+      --dos --log-file scan.log --test-cases ./my_tests
+
+  # Use a pre-captured schema file (skip live introspection)
+  python -m grapeql --api https://example.com/graphql \\
+      --schema-file schema.json --report report.md
             """,
         )
 
-        # Main argument for API endpoint
         parser.add_argument(
             "--api", required=True, help="URL of the GraphQL endpoint to test"
         )
 
-        # DoS testing flag
         parser.add_argument(
             "--dos",
             action="store_true",
-            help="Include Denial of Service testing (may cause performance issues)",
+            help="Include Denial of Service testing",
         )
 
-        # Proxy configuration
+        parser.add_argument("--proxy", help="Proxy address (host:port)")
+
+        parser.add_argument("--auth", help="Authorization token")
         parser.add_argument(
-            "--proxy", help="Proxy address in format host:port (e.g., 127.0.0.1:8080)"
+            "--auth-type", help="Auth token type (default: Bearer)", default="Bearer"
         )
 
-        # Authentication
-        parser.add_argument("--auth", help="Authorization token to include in requests")
-
-        parser.add_argument(
-            "--auth-type",
-            help="Authorization token type (e.g., Bearer, Basic). Default is Bearer.",
-            default="Bearer",
-        )
-
-        # Cookie - modified to accept multiple cookies
         parser.add_argument(
             "--cookie",
-            help="Cookie in format 'name:value' (can be used multiple times)",
+            help="Cookie in 'name:value' format (repeatable)",
             action="append",
             default=[],
         )
 
-        # Reporting options
-        parser.add_argument(
-            "--report", help="File name for the report (e.g., report.md)"
-        )
-
+        parser.add_argument("--report", help="Report output file path")
         parser.add_argument(
             "--report-format",
-            help="Report format (markdown or json, default: markdown)",
+            help="Report format (markdown or json)",
             default="markdown",
             choices=["markdown", "json"],
         )
 
-        # Injection testing credentials
-        parser.add_argument(
-            "--username", help="Username to use for injection testing (default: admin)"
-        )
+        parser.add_argument("--username", help="Username for injection testing")
+        parser.add_argument("--password", help="Password for injection testing")
 
+        # ── New in v3 ────────────────────────────────────────────
         parser.add_argument(
-            "--password",
-            help="Password to use for injection testing (default: changeme)",
+            "--log-file",
+            help="Path to structured log file. If omitted, logs go to stdout.",
+        )
+        parser.add_argument(
+            "--test-cases",
+            help="Directory containing YAML test case files (default: bundled)",
+            default=_DEFAULT_TEST_CASES_DIR,
+        )
+        parser.add_argument(
+            "--schema-file",
+            help=(
+                "Path to a JSON file containing the introspection schema "
+                "(the __schema object). Skips live introspection."
+            ),
         )
 
         return parser.parse_args()
 
-    def setup_client(self, client, args):
-        """
-        Configure a client with command line arguments.
-
-        Args:
-            client: Client to configure
-            args: Command line arguments
-        """
-        # Set proxy if provided
+    def _configure_client(self, client: GraphQLClient, args) -> None:
+        """Apply proxy, auth, and cookies to a client."""
         if args.proxy:
             try:
-                proxy_host, proxy_port = args.proxy.split(":")
-                client.configure_proxy(proxy_host, int(proxy_port))
+                host, port = args.proxy.split(":")
+                client.configure_proxy(host, int(port))
             except ValueError:
                 self.printer.print_msg(
-                    f"Invalid proxy format: {args.proxy}. Expected host:port",
-                    status="error",
+                    f"Invalid proxy format: {args.proxy}", status="error"
                 )
 
-        # Set authentication if provided
         if args.auth:
             client.set_authorization(args.auth, args.auth_type)
 
-        # Set cookies if provided - updated to handle multiple cookies
-        if args.cookie:
-            for cookie_str in args.cookie:
-                try:
-                    name, value = cookie_str.split(":", 1)
-                    client.set_cookie(name.strip(), value.strip())
-                    self.printer.print_msg(
-                        f"Set cookie {name.strip()}: {value.strip()}", status="success"
-                    )
-                except ValueError:
-                    self.printer.print_msg(
-                        f"Invalid cookie format: {cookie_str}. Expected 'name:value'",
-                        status="error",
-                    )
+        for cookie_str in args.cookie:
+            try:
+                name, value = cookie_str.split(":", 1)
+                client.set_cookie(name.strip(), value.strip())
+            except ValueError:
+                self.printer.print_msg(
+                    f"Invalid cookie format: {cookie_str}", status="error"
+                )
 
     async def main(self):
-        """
-        Main entry point for the CLI.
-
-        Returns:
-            int: Exit code (0 for success, 1 for failure)
-        """
         try:
-            # Parse arguments
             args = self.parse_arguments()
-
-            # Show intro
             self.printer.intro()
 
-            # Set target in reporter
-            self.reporter.set_target(args.api)
+            # ── Shared infrastructure ────────────────────────────
+            logger = GrapeLogger(log_file=args.log_file)
+            loader = TestCaseLoader(args.test_cases)
+            baseline = BaselineTracker()
 
-            # Run all tests on the endpoint
+            self.reporter.set_target(args.api)
             self.printer.print_section(f"Testing endpoint: {args.api}")
 
-            # Create a temporary client to set cookies and auth before introspection
-            temp_client = GraphQLClient()
-            temp_client.set_endpoint(args.api)
+            # ── Build a single "source of truth" client ──────────
+            #    Schema is retrieved ONCE here (or loaded from file)
+            #    and then forwarded to every module via pre_configured_client.
+            primary_client = GraphQLClient(logger=logger)
+            primary_client.set_endpoint(args.api)
+            self._configure_client(primary_client, args)
 
-            # Set proxy if provided
-            if args.proxy:
-                try:
-                    proxy_host, proxy_port = args.proxy.split(":")
-                    temp_client.configure_proxy(proxy_host, int(proxy_port))
-                except ValueError:
+            if args.schema_file:
+                # Load schema from JSON file instead of live introspection
+                self.printer.print_msg(
+                    f"Loading schema from {args.schema_file}", status="log"
+                )
+                with open(args.schema_file, "r") as f:
+                    schema_data = json.load(f)
+                # Support both {"__schema": {...}} and bare {...}
+                if "__schema" in schema_data:
+                    schema_data = schema_data["__schema"]
+                if not primary_client.load_schema_from_dict(schema_data):
                     self.printer.print_msg(
-                        f"Invalid proxy format: {args.proxy}. Expected host:port",
-                        status="error",
+                        "Failed to load schema from file", status="error"
                     )
+                    return 1
+            else:
+                if not await primary_client.introspection_query():
+                    self.printer.print_msg(
+                        "Introspection failed — cannot proceed", status="error"
+                    )
+                    return 1
 
-            # Apply auth and cookies before any introspection query
-            if args.auth:
-                temp_client.set_authorization(args.auth, args.auth_type)
-
-            if args.cookie:
-                for cookie_str in args.cookie:
-                    try:
-                        name, value = cookie_str.split(":", 1)
-                        temp_client.set_cookie(name.strip(), value.strip())
-                        self.printer.print_msg(
-                            f"Set cookie {name.strip()}: {value.strip()}",
-                            status="success",
-                        )
-                    except ValueError:
-                        self.printer.print_msg(
-                            f"Invalid cookie format: {cookie_str}. Expected 'name:value'",
-                            status="error",
-                        )
-
-            # Pass the configured client to setup_endpoint calls to use for initial introspection
+            # ── Parallel test execution ──────────────────────────
 
             async def run_fingerprint_test():
-                fingerprinter = Fingerprinter()
-                if await fingerprinter.setup_endpoint(
-                    args.api, args.proxy, temp_client
-                ):
-                    await fingerprinter.fingerprint()
+                fp = Fingerprinter(
+                    logger=logger, loader=loader, baseline=baseline
+                )
+                if await fp.setup_endpoint(args.api, args.proxy, primary_client):
+                    await fp.fingerprint()
                     with self.reporter_lock:
-                        self.reporter.add_findings(fingerprinter.get_findings())
+                        self.reporter.add_findings(fp.get_findings())
 
             async def run_info_test():
-                info_tester = InfoTester()
-                if await info_tester.setup_endpoint(args.api, args.proxy, temp_client):
-                    await info_tester.run_test()
+                it = InfoTester(
+                    logger=logger, loader=loader, baseline=baseline
+                )
+                if await it.setup_endpoint(args.api, args.proxy, primary_client):
+                    await it.run_test()
                     with self.reporter_lock:
-                        self.reporter.add_findings(info_tester.get_findings())
+                        self.reporter.add_findings(it.get_findings())
 
             async def run_injection_test():
-                injection_tester = InjectionTester()
-                if await injection_tester.setup_endpoint(
-                    args.api, args.proxy, temp_client
-                ):
+                inj = InjectionTester(
+                    logger=logger, loader=loader, baseline=baseline
+                )
+                if await inj.setup_endpoint(args.api, args.proxy, primary_client):
                     if args.username or args.password:
-                        username = args.username or "admin"
-                        password = args.password or "changeme"
-                        injection_tester.set_credentials(username, password)
-                        with self.printer_lock:
-                            self.printer.print_msg(
-                                f"Using custom injection testing credentials: {username}:{password}",
-                                status="log",
-                            )
-                    await injection_tester.run_test()
+                        inj.set_credentials(
+                            args.username or "admin",
+                            args.password or "changeme",
+                        )
+                    await inj.run_test()
                     with self.reporter_lock:
-                        self.reporter.add_findings(injection_tester.get_findings())
+                        self.reporter.add_findings(inj.get_findings())
 
             def run_async_test(coro):
                 return asyncio.run(coro())
 
             with ThreadPoolExecutor(max_workers=3) as executor:
-
-                test_futures = [
+                futures = [
                     executor.submit(run_async_test, run_fingerprint_test),
                     executor.submit(run_async_test, run_info_test),
                     executor.submit(run_async_test, run_injection_test),
                 ]
-
-                # Wait for all tests to complete
-                for future in test_futures:
+                for future in futures:
                     try:
                         future.result()
                     except Exception as e:
                         with self.printer_lock:
                             self.printer.print_msg(
-                                f"Error during test execution: {str(e)}", status="error"
+                                f"Error during test: {str(e)}", status="error"
                             )
 
-            # DoS tests - only run if the --dos flag is provided
+            # ── Print baseline summary ───────────────────────────
+            summary = baseline.summary()
+            agg = summary.get("_aggregate", {})
+            if agg.get("count", 0) > 0:
+                self.printer.print_msg(
+                    f"Baseline: {agg['count']} samples, "
+                    f"avg={agg['mean']:.3f}s, stddev={agg['stddev']:.3f}s",
+                    status="log",
+                )
+
+            # ── DoS tests (sequential, after baseline is built) ──
             if args.dos:
                 self.printer.print_msg(
-                    "DoS testing enabled - this may cause performance issues for the target server",
+                    "DoS testing enabled — server may become unresponsive",
                     status="warning",
                 )
-                dos_tester = DosTester()
-                if await dos_tester.setup_endpoint(args.api, args.proxy, temp_client):
-                    # No need to call setup_client again
-                    await dos_tester.run_test()
-                    self.reporter.add_findings(dos_tester.get_findings())
+                dos = DosTester(
+                    logger=logger, loader=loader, baseline=baseline
+                )
+                if await dos.setup_endpoint(args.api, args.proxy, primary_client):
+                    await dos.run_test()
+                    self.reporter.add_findings(dos.get_findings())
             else:
                 self.printer.print_msg(
                     "DoS testing skipped (use --dos to enable)", status="log"
                 )
 
-            # Generate report if requested
+            # ── Report ───────────────────────────────────────────
             if args.report:
                 self.reporter.generate_report(
                     output_format=args.report_format, output_file=args.report
                 )
             else:
-                # Just print the summary
                 self.reporter.print_summary()
 
             return 0
