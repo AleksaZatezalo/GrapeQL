@@ -73,26 +73,7 @@ grapeql --api https://example.com/graphql --dos
 
 # Use a proxy
 grapeql --api https://example.com/graphql --proxy 127.0.0.1:8080
-
-# Add authentication
-grapeql --api https://example.com/graphql --auth "your_token_here" --auth-type Bearer
-
-# Include a session cookie
-grapeql --api https://example.com/graphql --cookie "session:abc123"
-
-# Generate a markdown report
-grapeql --api https://example.com/graphql --report report.md
-
-# Generate a JSON report
-grapeql --api https://example.com/graphql --report report.json --report-format json
-
-# Custom injection testing credentials
-grapeql --api https://example.com/graphql --username test_user --password test_pass
 ```
-
-## Using GrapeQL as a Library
-
-GrapeQL can be integrated into your Python applications as a library. This approach provides more flexibility and allows for custom testing workflows.
 
 ### Core Components
 
