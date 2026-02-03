@@ -1,253 +1,219 @@
 """
 GrapeQL Information Disclosure Tester
 Author: Aleksa Zatezalo
-Version: 2.0
-Date: April 2025
-Description: Tests GraphQL endpoints for information disclosure vulnerabilities
+Version: 3.0
+Date: February 2025
+Description: Tests GraphQL endpoints for information disclosure vulnerabilities.
+             Check definitions are loaded from YAML test cases.
 """
 
+import time
+import json
 from typing import Dict, List, Optional, Tuple, Any
 from .tester import VulnerabilityTester
 from .utils import Finding
+from .logger import GrapeLogger
+from .loader import TestCaseLoader
+from .baseline import BaselineTracker
 
 
 class InfoTester(VulnerabilityTester):
     """
-    Tests GraphQL endpoints for information disclosure issues like
-    field suggestions, CSRF vulnerabilities, and insecure configurations.
+    Tests GraphQL endpoints for information disclosure issues.
+    Check definitions come from ``test_cases/info/*.yaml``.
     """
 
-    def __init__(self):
-        """Initialize the information tester."""
-        super().__init__()
+    MODULE_NAME = "info"
+
+    def __init__(
+        self,
+        logger: Optional[GrapeLogger] = None,
+        loader: Optional[TestCaseLoader] = None,
+        baseline: Optional[BaselineTracker] = None,
+    ):
+        super().__init__(logger=logger, loader=loader, baseline=baseline)
         self.test_name = "GraphQL Information Disclosure Testing"
-        self.debug_mode = False
 
-    async def check_field_suggestions(self) -> Optional[Finding]:
+    # ------------------------------------------------------------------ #
+    #  Generic check runner driven by YAML definitions
+    # ------------------------------------------------------------------ #
+
+    async def _run_check(self, check: Dict[str, Any]) -> Optional[Finding]:
         """
-        Check if field suggestions are enabled, which can leak schema information.
-
-        Returns:
-            Optional[Finding]: Finding if vulnerable, None otherwise
+        Execute a single YAML-defined check and return a Finding if it triggers.
         """
-        # Send an intentionally invalid query with a typo
-        query = "query { __schema { directive } }"
+        name = check.get("name", "unknown")
+        method = check.get("method", "POST").upper()
+        detection = check.get("detection", {})
+        self.client.set_log_context("InfoTester", name)
 
-        response, _ = await self.client.graphql_query(query)
+        start = time.time()
 
-        if not response or "errors" not in response:
+        # ── Special: just check if schema already exists ─────────
+        if method == "CHECK_SCHEMA":
+            duration = time.time() - start
+            self._record_response_time(duration)
+            if detection.get("type") == "schema_exists" and self.client.schema:
+                return self._finding_from_check(check)
             return None
 
-        # Check if "Did you mean" appears in error messages
-        suggestions_enabled = any(
-            "did you mean" in str(err.get("message", "")).lower()
-            for err in response.get("errors", [])
-        )
+        # ── Prepare and send the request ─────────────────────────
+        send_as = check.get("send_as", "json")
+        query = check.get("query", "")
+        response = None
 
-        if suggestions_enabled:
-            finding = Finding(
-                title="Field Suggestions Enabled",
-                severity="LOW",
-                description="The GraphQL server is providing field suggestions in error messages, which can help attackers discover schema information",
-                endpoint=self.client.endpoint,
-                impact="Information Leakage - Schema details are being disclosed",
-                remediation="Disable field suggestions in production environments",
+        if send_as == "url_param":
+            # GET with ?query=...
+            response, _ = await self.client.make_request(
+                "GET",
+                url=f"{self.client.endpoint}?query={query}",
+                _log_parameter=name,
+                _log_payload=query,
             )
-            return finding
 
-        return None
-
-    async def check_get_method_query(self) -> Optional[Finding]:
-        """
-        Check if GraphQL queries are allowed over GET requests,
-        which may enable CSRF attacks.
-
-        Returns:
-            Optional[Finding]: Finding if vulnerable, None otherwise
-        """
-        query = "query { __typename }"
-
-        # Use direct make_request to bypass normal GraphQL query handling
-        response, _ = await self.client.make_request(
-            "GET", url=f"{self.client.endpoint}?query={query}"
-        )
-
-        if not response:
-            return None
-
-        # Check if the query was successful
-        if response.get("data", {}).get("__typename"):
-            finding = Finding(
-                title="GET-based Queries Enabled (Possible CSRF)",
-                severity="MEDIUM",
-                description="The GraphQL server allows queries via GET requests, which may enable cross-site request forgery (CSRF) attacks",
-                endpoint=self.client.endpoint,
-                impact="Attackers may be able to execute operations using the victim's credentials",
-                remediation="Disable GET method for GraphQL queries or implement proper CSRF protections",
+        elif send_as == "form_data":
+            original_ct = self.client.headers.get("Content-Type")
+            self.client.headers["Content-Type"] = check.get(
+                "content_type", "application/x-www-form-urlencoded"
             )
-            return finding
-
-        return None
-
-    async def check_get_method_mutation(self) -> Optional[Finding]:
-        """
-        Check if GraphQL mutations are allowed over GET requests,
-        which may enable CSRF attacks.
-
-        Returns:
-            Optional[Finding]: Finding if vulnerable, None otherwise
-        """
-        query = "mutation { __typename }"
-
-        # Use direct make_request to bypass normal GraphQL query handling
-        response, _ = await self.client.make_request(
-            "GET", url=f"{self.client.endpoint}?query={query}"
-        )
-
-        if not response:
-            return None
-
-        # Check if the mutation was successful
-        if response.get("data", {}).get("__typename"):
-            finding = Finding(
-                title="GET-based Mutations Enabled (Possible CSRF)",
-                severity="HIGH",
-                description="The GraphQL server allows mutations via GET requests, which enables cross-site request forgery (CSRF) attacks",
-                endpoint=self.client.endpoint,
-                impact="Attackers can modify data using the victim's credentials",
-                remediation="Disable GET method for GraphQL mutations and implement proper CSRF protections",
-            )
-            return finding
-
-        return None
-
-    async def check_post_urlencoded(self) -> Optional[Finding]:
-        """
-        Check if GraphQL supports urlencoded form data, which may enable CSRF attacks.
-
-        Returns:
-            Optional[Finding]: Finding if vulnerable, None otherwise
-        """
-        query = "query { __typename }"
-
-        # Save original content type
-        original_content_type = self.client.headers.get("Content-Type")
-
-        # Set URL encoded content type
-        self.client.headers["Content-Type"] = "application/x-www-form-urlencoded"
-
-        try:
-            # Use direct make_request with form data
-            response, _ = await self.client.make_request("POST", data={"query": query})
-
-            if response and response.get("data", {}).get("__typename"):
-                finding = Finding(
-                    title="URL-encoded POST Queries Enabled (Possible CSRF)",
-                    severity="MEDIUM",
-                    description="The GraphQL server accepts queries via URL-encoded form data, which may enable cross-site request forgery (CSRF) attacks",
-                    endpoint=self.client.endpoint,
-                    impact="Attackers may be able to execute operations using the victim's credentials",
-                    remediation="Only accept application/json content type for GraphQL operations",
+            try:
+                response, _ = await self.client.make_request(
+                    "POST",
+                    data={"query": query},
+                    _log_parameter=name,
+                    _log_payload=query,
                 )
-                return finding
-        finally:
-            # Restore original content type
-            if original_content_type:
-                self.client.headers["Content-Type"] = original_content_type
-            else:
-                del self.client.headers["Content-Type"]
+            finally:
+                if original_ct:
+                    self.client.headers["Content-Type"] = original_ct
+                else:
+                    self.client.headers.pop("Content-Type", None)
+
+        elif send_as == "batch":
+            batch = [{"query": q} for q in check.get("batch_queries", [])]
+            response, _ = await self.client.make_request(
+                "POST",
+                json=batch,
+                _log_parameter=name,
+                _log_payload="batch",
+            )
+
+        elif method == "GET":
+            # Plain GET to endpoint (for graphiql detection)
+            response, _ = await self.client.make_request(
+                "GET",
+                _log_parameter=name,
+                _log_payload="-",
+            )
+
+        else:
+            # Standard POST with query body
+            response, _ = await self.client.graphql_query(
+                query,
+                _log_parameter=name,
+                _log_payload=query,
+            )
+
+        duration = time.time() - start
+        self._record_response_time(duration)
+
+        if response is None:
+            return None
+
+        # ── Evaluate detection rules ─────────────────────────────
+        det_type = detection.get("type", "")
+
+        if det_type == "error_contains":
+            value = detection["value"]
+            ci = detection.get("case_insensitive", False)
+            errors = response.get("errors", [])
+            matched = any(
+                (value.lower() if ci else value)
+                in (err.get("message", "").lower() if ci else err.get("message", ""))
+                for err in errors
+            )
+            if matched:
+                return self._finding_from_check(check)
+
+        elif det_type == "data_field_exists":
+            field = detection["field"]
+            if response.get("data", {}).get(field):
+                return self._finding_from_check(check)
+
+        elif det_type == "response_contains_any":
+            text = str(response.get("text", ""))
+            ci = detection.get("case_insensitive", False)
+            if ci:
+                text = text.lower()
+            for val in detection.get("values", []):
+                if (val.lower() if ci else val) in text:
+                    return self._finding_from_check(check)
+
+        elif det_type == "batch_response":
+            expected = detection.get("expected_count", 2)
+            if isinstance(response, list) and len(response) == expected:
+                return self._finding_from_check(check)
 
         return None
 
-    async def check_introspection(self) -> Optional[Finding]:
-        """
-        Check if introspection is enabled, which can expose schema details.
+    # ------------------------------------------------------------------ #
+    #  Helper to build a Finding from a YAML check definition
+    # ------------------------------------------------------------------ #
 
-        Returns:
-            Optional[Finding]: Finding if vulnerable, None otherwise
-        """
-        # We already know introspection is enabled if we have schema info
+    @staticmethod
+    def _finding_from_check(check: Dict[str, Any]) -> Finding:
+        return Finding(
+            title=check["title"],
+            severity=check.get("severity", "LOW"),
+            description=check.get("description", ""),
+            endpoint="",  # will be patched in run_test
+            impact=check.get("impact", ""),
+            remediation=check.get("remediation", ""),
+        )
+
+    # ------------------------------------------------------------------ #
+    #  Hardcoded fallbacks (used if no YAML loaded)
+    # ------------------------------------------------------------------ #
+
+    async def _run_hardcoded_checks(self) -> None:
+        """Run the original hardcoded checks when no YAML is available."""
+        # Field suggestions
+        response, _ = await self.client.graphql_query(
+            "query { __schema { directive } }"
+        )
+        if response and any(
+            "did you mean" in str(e.get("message", "")).lower()
+            for e in response.get("errors", [])
+        ):
+            self.add_finding(
+                Finding(
+                    title="Field Suggestions Enabled",
+                    severity="LOW",
+                    description="Field suggestions in error messages leak schema info",
+                    endpoint=self.client.endpoint,
+                    impact="Information Leakage",
+                    remediation="Disable field suggestions in production",
+                )
+            )
+
+        # Introspection
         if self.client.schema:
-            finding = Finding(
-                title="Introspection Enabled",
-                severity="MEDIUM",
-                description="The GraphQL server has introspection enabled, which exposes detailed schema information",
-                endpoint=self.client.endpoint,
-                impact="Attackers can map the entire GraphQL schema and discover available operations",
-                remediation="Disable introspection in production environments or implement authorization controls",
+            self.add_finding(
+                Finding(
+                    title="Introspection Enabled",
+                    severity="MEDIUM",
+                    description="Introspection exposes the full schema",
+                    endpoint=self.client.endpoint,
+                    impact="Schema mapping by attackers",
+                    remediation="Disable introspection in production",
+                )
             )
-            return finding
 
-        return None
-
-    async def check_graphiql(self) -> Optional[Finding]:
-        """
-        Check if GraphiQL or Playground is enabled, which can aid attackers.
-
-        Returns:
-            Optional[Finding]: Finding if vulnerable, None otherwise
-        """
-        # Check for GraphiQL
-        response, _ = await self.client.make_request("GET")
-
-        if not response:
-            return None
-
-        # Look for GraphiQL or Playground indicators in the response
-        response_text = str(response.get("text", "")).lower()
-
-        if "graphiql" in response_text or "playground" in response_text:
-            finding = Finding(
-                title="GraphiQL/Playground Enabled",
-                severity="LOW",
-                description="The GraphQL server has GraphiQL or Playground enabled, providing a UI for exploring the API",
-                endpoint=self.client.endpoint,
-                impact="Makes it easier for attackers to explore and test the API",
-                remediation="Disable GraphiQL/Playground in production environments",
-            )
-            return finding
-
-        return None
-
-    async def check_batch_support(self) -> Optional[Finding]:
-        """
-        Check if the server supports query batching, which can amplify attacks.
-
-        Returns:
-            Optional[Finding]: Finding if vulnerable, None otherwise
-        """
-        # Create a simple batch of two queries
-        batch_query = [
-            {"query": "query { __typename }"},
-            {"query": "query { __typename }"},
-        ]
-
-        response, _ = await self.client.make_request("POST", json=batch_query)
-
-        if not response:
-            return None
-
-        # Check if batch was processed successfully (should be an array)
-        if isinstance(response, list) and len(response) == 2:
-            finding = Finding(
-                title="Query Batching Enabled",
-                severity="LOW",
-                description="The GraphQL server supports query batching, which can be used to amplify attacks",
-                endpoint=self.client.endpoint,
-                impact="Attackers can send multiple operations in a single request, potentially bypassing rate limits",
-                remediation="Implement per-operation rate limiting and set maximum batch size limits",
-            )
-            return finding
-
-        return None
+    # ------------------------------------------------------------------ #
+    #  Main entry point
+    # ------------------------------------------------------------------ #
 
     async def run_test(self) -> List[Finding]:
-        """
-        Run all information disclosure tests and return findings.
-
-        Returns:
-            List[Finding]: All findings from the test
-        """
         if not self.client.endpoint:
             self.printer.print_msg(
                 "No endpoint set. Run setup_endpoint first.", status="error"
@@ -256,32 +222,30 @@ class InfoTester(VulnerabilityTester):
 
         self.printer.print_section("Starting Information Disclosure Testing")
 
-        # Define all tests to run
-        tests = [
-            ("Field Suggestions", self.check_field_suggestions),
-            ("GET-based Queries", self.check_get_method_query),
-            ("GET-based Mutations", self.check_get_method_mutation),
-            ("URL-encoded POST", self.check_post_urlencoded),
-            ("Introspection", self.check_introspection),
-            ("GraphiQL/Playground", self.check_graphiql),
-            ("Query Batching", self.check_batch_support),
-        ]
+        if not self.test_cases:
+            self.printer.print_msg(
+                "No YAML checks loaded — running hardcoded checks", status="warning"
+            )
+            await self._run_hardcoded_checks()
+            return self.findings
 
-        # Run each test
-        for test_name, test_func in tests:
+        for check in self.test_cases:
+            test_name = check.get("name", "unknown")
             self.printer.print_msg(f"Testing for {test_name}...", status="log")
 
             try:
-                finding = await test_func()
-
+                finding = await self._run_check(check)
                 if finding:
+                    finding.endpoint = self.client.endpoint
                     self.add_finding(finding)
+                    status = "warning" if finding.severity != "HIGH" else "failed"
                     self.printer.print_msg(
-                        f"Found issue: {finding.title}",
-                        status="warning" if finding.severity != "HIGH" else "failed",
+                        f"Found issue: {finding.title}", status=status
                     )
                 else:
-                    self.printer.print_msg(f"{test_name} test passed", status="success")
+                    self.printer.print_msg(
+                        f"{test_name} test passed", status="success"
+                    )
             except Exception as e:
                 self.printer.print_msg(
                     f"Error testing {test_name}: {str(e)}", status="error"

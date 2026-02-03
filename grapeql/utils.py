@@ -1,8 +1,8 @@
 """
 GrapeQL Utilities
 Author: Aleksa Zatezalo
-Version: 2.0
-Date: April 2025
+Version: 3.0
+Date: February 2025
 Description: Utility functions and classes for GrapeQL
 """
 

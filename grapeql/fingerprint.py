@@ -1,142 +1,50 @@
 """
 GrapeQL Fingerprinting Module
 Author: Aleksa Zatezalo
-Version: 2.0
-Date: April 2025
-Description: Fingerprinting module to identify GraphQL engine implementations
+Version: 3.0
+Date: February 2025
+Description: Fingerprinting module to identify GraphQL engine implementations.
+             Engine probe definitions are loaded from YAML test cases.
 """
 
-from typing import Dict, List, Optional, Tuple, Set
+from typing import Dict, List, Optional, Tuple, Set, Any
 from .client import GraphQLClient
 from .utils import GrapePrinter, Finding
+from .logger import GrapeLogger
+from .loader import TestCaseLoader
+from .baseline import BaselineTracker
+
+import time
 
 
 class Fingerprinter:
     """
     Identifies GraphQL server implementations through behavioral fingerprinting.
+    Probe queries and expected signatures are loaded from YAML test cases.
     """
 
-    def __init__(self):
-        """Initialize the fingerprinter."""
-        self.client = GraphQLClient()
+    MODULE_NAME = "fingerprint"
+
+    def __init__(
+        self,
+        logger: Optional[GrapeLogger] = None,
+        loader: Optional[TestCaseLoader] = None,
+        baseline: Optional[BaselineTracker] = None,
+    ):
+        self.client = GraphQLClient(logger=logger)
         self.printer = GrapePrinter()
-        self.findings = []
-        self.engines = {
-            "apollo": {
-                "name": "Apollo Server",
-                "url": "https://www.apollographql.com/",
-                "tech": ["Node.js", "JavaScript"],
-                "cve": ["CVE-2023-30783", "CVE-2022-21721"],
-            },
-            "graphql-yoga": {
-                "name": "GraphQL Yoga",
-                "url": "https://graphql-yoga.com/",
-                "tech": ["Node.js", "JavaScript"],
-                "cve": [],
-            },
-            "aws-appsync": {
-                "name": "AWS AppSync",
-                "url": "https://aws.amazon.com/appsync/",
-                "tech": ["AWS"],
-                "cve": [],
-            },
-            "graphene": {
-                "name": "Graphene",
-                "url": "https://graphene-python.org/",
-                "tech": ["Python"],
-                "cve": [],
-            },
-            "hasura": {
-                "name": "Hasura GraphQL Engine",
-                "url": "https://hasura.io/",
-                "tech": ["Haskell"],
-                "cve": ["CVE-2023-22465", "CVE-2021-32675"],
-            },
-            "graphql-php": {
-                "name": "GraphQL PHP",
-                "url": "https://webonyx.github.io/graphql-php/",
-                "tech": ["PHP"],
-                "cve": [],
-            },
-            "ruby-graphql": {
-                "name": "Ruby GraphQL",
-                "url": "https://graphql-ruby.org/",
-                "tech": ["Ruby"],
-                "cve": [],
-            },
-            "hypergraphql": {
-                "name": "HyperGraphQL",
-                "url": "https://www.hypergraphql.org/",
-                "tech": ["Java"],
-                "cve": [],
-            },
-            "graphql-java": {
-                "name": "GraphQL Java",
-                "url": "https://www.graphql-java.com/",
-                "tech": ["Java"],
-                "cve": [],
-            },
-            "ariadne": {
-                "name": "Ariadne",
-                "url": "https://ariadnegraphql.org/",
-                "tech": ["Python"],
-                "cve": [],
-            },
-            "graphql-api-for-wp": {
-                "name": "GraphQL API for WordPress",
-                "url": "https://graphql-api.com/",
-                "tech": ["PHP", "WordPress"],
-                "cve": [],
-            },
-            "wp-graphql": {
-                "name": "WPGraphQL",
-                "url": "https://www.wpgraphql.com/",
-                "tech": ["PHP", "WordPress"],
-                "cve": [],
-            },
-            "gqlgen": {
-                "name": "gqlgen",
-                "url": "https://gqlgen.com/",
-                "tech": ["Go"],
-                "cve": [],
-            },
-            "graphql-go": {
-                "name": "graphql-go",
-                "url": "https://github.com/graphql-go/graphql",
-                "tech": ["Go"],
-                "cve": [],
-            },
-            "juniper": {
-                "name": "Juniper",
-                "url": "https://graphql-rust.github.io/",
-                "tech": ["Rust"],
-                "cve": [],
-            },
-            "sangria": {
-                "name": "Sangria",
-                "url": "https://sangria-graphql.github.io/",
-                "tech": ["Scala"],
-                "cve": [],
-            },
-            "strawberry": {
-                "name": "Strawberry GraphQL",
-                "url": "https://strawberry.rocks/",
-                "tech": ["Python"],
-                "cve": [],
-            },
-            "mercurius": {
-                "name": "Mercurius",
-                "url": "https://mercurius.dev/",
-                "tech": ["Node.js", "Fastify"],
-                "cve": [],
-            },
-            "lighthouse": {
-                "name": "Lighthouse",
-                "url": "https://lighthouse-php.com/",
-                "tech": ["PHP", "Laravel"],
-                "cve": [],
-            },
-        }
+        self.logger = logger
+        self.baseline = baseline
+        self.findings: List[Finding] = []
+
+        # Load engine definitions from YAML (falls back to empty list)
+        self.engines: List[Dict[str, Any]] = []
+        if loader:
+            self.engines = loader.load_module(self.MODULE_NAME)
+
+    # ------------------------------------------------------------------ #
+    #  Setup
+    # ------------------------------------------------------------------ #
 
     async def setup_endpoint(
         self,
@@ -144,19 +52,7 @@ class Fingerprinter:
         proxy: Optional[str] = None,
         pre_configured_client: Optional[GraphQLClient] = None,
     ) -> bool:
-        """
-        Set up the fingerprinter with the target endpoint.
-
-        Args:
-            endpoint: GraphQL endpoint URL
-            proxy: Optional proxy in host:port format
-            pre_configured_client: Optional pre-configured client with cookies, auth tokens, etc.
-
-        Returns:
-            bool: True if setup was successful
-        """
         if pre_configured_client:
-            # Copy all relevant properties from the pre-configured client
             self.client.endpoint = pre_configured_client.endpoint
             self.client.proxy_url = pre_configured_client.proxy_url
             self.client.headers = pre_configured_client.headers.copy()
@@ -173,194 +69,95 @@ class Fingerprinter:
                 if pre_configured_client.mutation_fields
                 else {}
             )
-
-            # If the pre-configured client already has schema data, consider setup successful
             if pre_configured_client.schema:
                 return True
 
-        # Proceed with normal setup if no pre-configured client or it has no schema
         return await self.client.setup_endpoint(endpoint, proxy)
+
+    # ------------------------------------------------------------------ #
+    #  Probe helpers
+    # ------------------------------------------------------------------ #
 
     def _error_contains(
         self, response: Dict, error_text: str, part: str = "message"
     ) -> bool:
-        """
-        Check if a response contains a specific error message.
-
-        Args:
-            response: Response data
-            error_text: Error text to look for
-            part: Part of the error to check (message, code, etc.)
-
-        Returns:
-            bool: True if error contains the specified text
-        """
         errors = response.get("errors", [])
         return any(
             error_text.lower() in error.get(part, "").lower() for error in errors
         )
 
-    async def test_apollo(self) -> bool:
-        """Test if the endpoint is running Apollo Server."""
-        query = "query @skip { __typename }"
-        response, _ = await self.client.graphql_query(query)
-        if response and self._error_contains(
-            response, 'Directive "@skip" argument "if" of type "Boolean!" is required'
-        ):
-            return True
+    async def _run_probe(self, probe: Dict) -> bool:
+        """
+        Execute a single probe definition and return True if it matched.
 
-        query = "query @deprecated { __typename }"
-        response, _ = await self.client.graphql_query(query)
-        return response and self._error_contains(
-            response, 'Directive "@deprecated" may not be used on QUERY'
+        Probe dict keys:
+          - query             : GraphQL query string
+          - expect_error      : single error substring to match
+          - expect_error_any  : list — match if ANY appear
+          - expect_error_part : {part, value} — check a non-message field
+          - expect_data       : dict of data fields to match exactly
+          - expect_has_data   : True if "data" key must be present
+          - expect_no_data    : True if "data" key must be absent
+        """
+        query = probe.get("query", "")
+        self.client.set_log_context("Fingerprinter", "probe")
+
+        start = time.time()
+        response, _ = await self.client.graphql_query(
+            query,
+            _log_parameter="engine_probe",
+            _log_payload=query[:100],
         )
+        duration = time.time() - start
 
-    async def test_yoga(self) -> bool:
-        """Test if the endpoint is running GraphQL Yoga."""
-        query = """subscription { __typename }"""
-        response, _ = await self.client.graphql_query(query)
-        return response and (
-            self._error_contains(
-                response, "asyncExecutionResult[Symbol.asyncIterator] is not a function"
-            )
-            or self._error_contains(response, "Unexpected error.")
-        )
+        # Record baseline
+        if self.baseline:
+            self.baseline.record("Fingerprinter", duration)
 
-    async def test_aws_appsync(self) -> bool:
-        """Test if the endpoint is running AWS AppSync."""
-        query = "query @skip { __typename }"
-        response, _ = await self.client.graphql_query(query)
-        return response and self._error_contains(response, "MisplacedDirective")
+        if not response:
+            return False
 
-    async def test_graphene(self) -> bool:
-        """Test if the endpoint is running Graphene."""
-        query = "aaa"
-        response, _ = await self.client.graphql_query(query)
-        return response and self._error_contains(response, "Syntax Error GraphQL (1:1)")
+        # ── expect_error ─────────────────────────────────────────
+        if "expect_error" in probe:
+            if not self._error_contains(response, probe["expect_error"]):
+                return False
 
-    async def test_hasura(self) -> bool:
-        """Test if the endpoint is running Hasura."""
-        query = """query @cached { __typename }"""
-        response, _ = await self.client.graphql_query(query)
-        if response and response.get("data", {}).get("__typename") == "query_root":
-            return True
+        # ── expect_error_any ─────────────────────────────────────
+        if "expect_error_any" in probe:
+            if not any(
+                self._error_contains(response, err)
+                for err in probe["expect_error_any"]
+            ):
+                return False
 
-        query = "query { aaa }"
-        response, _ = await self.client.graphql_query(query)
-        if response and self._error_contains(
-            response, "field \"aaa\" not found in type: 'query_root'"
-        ):
-            return True
+        # ── expect_error_part ────────────────────────────────────
+        if "expect_error_part" in probe:
+            eep = probe["expect_error_part"]
+            if not self._error_contains(response, eep["value"], part=eep["part"]):
+                return False
 
-        query = "query @skip { __typename }"
-        response, _ = await self.client.graphql_query(query)
-        if response and self._error_contains(
-            response, 'directive "skip" is not allowed on a query'
-        ):
-            return True
+        # ── expect_data ──────────────────────────────────────────
+        if "expect_data" in probe:
+            data = response.get("data", {})
+            for key, val in probe["expect_data"].items():
+                if data.get(key) != val:
+                    return False
 
-        query = "query { __schema }"
-        response, _ = await self.client.graphql_query(query)
-        return response and self._error_contains(
-            response, 'missing selection set for "__Schema"'
-        )
+        # ── expect_has_data / expect_no_data ─────────────────────
+        if probe.get("expect_has_data") and "data" not in response:
+            return False
+        if probe.get("expect_no_data") and "data" in response:
+            return False
 
-    async def test_graphql_php(self) -> bool:
-        """Test if the endpoint is running GraphQL PHP."""
-        query = "query ! { __typename }"
-        response, _ = await self.client.graphql_query(query)
-        if response and self._error_contains(
-            response, 'Syntax Error: Cannot parse the unexpected character "?"'
-        ):
-            return True
+        return True
 
-        query = "query @deprecated { __typename }"
-        response, _ = await self.client.graphql_query(query)
-        return response and self._error_contains(
-            response, 'Directive "deprecated" may not be used on "QUERY"'
-        )
-
-    async def test_ruby_graphql(self) -> bool:
-        """Test if the endpoint is running Ruby GraphQL."""
-        query = "query @skip { __typename }"
-        response, _ = await self.client.graphql_query(query)
-        if response and self._error_contains(
-            response, "'@skip' can't be applied to queries"
-        ):
-            return True
-        elif response and self._error_contains(
-            response, "Directive 'skip' is missing required arguments: if"
-        ):
-            return True
-
-        query = "query @deprecated { __typename }"
-        response, _ = await self.client.graphql_query(query)
-        if response and self._error_contains(
-            response, "'@deprecated' can't be applied to queries"
-        ):
-            return True
-
-        query = """query { __typename { }"""
-        response, _ = await self.client.graphql_query(query)
-        return response and self._error_contains(
-            response, 'Parse error on "}" (RCURLY)'
-        )
-
-    async def test_strawberry(self) -> bool:
-        """Test if the endpoint is running Strawberry."""
-        query = "query @deprecated { __typename }"
-        response, _ = await self.client.graphql_query(query)
-        return (
-            response
-            and self._error_contains(
-                response, "Directive '@deprecated' may not be used on query."
-            )
-            and "data" in response
-        )
-
-    async def test_lighthouse(self) -> bool:
-        """Test if the endpoint is running Lighthouse."""
-        query = "query { __typename @include(if: falsee) }"
-        response, _ = await self.client.graphql_query(query)
-        return response and (
-            self._error_contains(response, "Internal server error")
-            or self._error_contains(response, "internal", part="category")
-        )
-
-    async def test_juniper(self) -> bool:
-        """Test if the endpoint is running Juniper."""
-        query = "queryy { __typename }"
-        response, _ = await self.client.graphql_query(query)
-        if response and self._error_contains(response, 'Unexpected "queryy"'):
-            return True
-
-        query = ""
-        response, _ = await self.client.graphql_query(query)
-        return response and self._error_contains(response, "Unexpected end of input")
-
-    async def test_ariadne(self) -> bool:
-        """Test if the endpoint is running Ariadne."""
-        query = "query { __typename @abc }"
-        response, _ = await self.client.graphql_query(query)
-        if (
-            response
-            and self._error_contains(response, "Unknown directive '@abc'.")
-            and "data" not in response
-        ):
-            return True
-
-        query = ""
-        response, _ = await self.client.graphql_query(query)
-        return response and self._error_contains(
-            response, "The query must be a string."
-        )
+    # ------------------------------------------------------------------ #
+    #  Main fingerprint loop
+    # ------------------------------------------------------------------ #
 
     async def fingerprint(self) -> Optional[Dict]:
         """
-        Identify the GraphQL engine being used.
-
-        Returns:
-            Optional[Dict]: Engine details if identified, None otherwise
+        Identify the GraphQL engine by running YAML-defined probes.
         """
         self.printer.print_section("Fingerprinting GraphQL Engine")
 
@@ -368,53 +165,53 @@ class Fingerprinter:
             self.printer.print_msg("No endpoint set", status="error")
             return None
 
-        # Define all tests to run with their corresponding engine IDs
-        tests = [
-            (self.test_apollo, "apollo"),
-            (self.test_yoga, "graphql-yoga"),
-            (self.test_aws_appsync, "aws-appsync"),
-            (self.test_graphene, "graphene"),
-            (self.test_hasura, "hasura"),
-            (self.test_graphql_php, "graphql-php"),
-            (self.test_ruby_graphql, "ruby-graphql"),
-            (self.test_ariadne, "ariadne"),
-            (self.test_strawberry, "strawberry"),
-            (self.test_juniper, "juniper"),
-            (self.test_lighthouse, "lighthouse"),
-        ]
+        if not self.engines:
+            self.printer.print_msg(
+                "No engine definitions loaded — check test_cases/fingerprint/",
+                status="warning",
+            )
+            return None
 
-        # Run all the tests
-        for test_func, engine_id in tests:
+        for engine_def in self.engines:
+            engine_id = engine_def.get("engine_id", "unknown")
+            engine_name = engine_def.get("name", engine_id)
+            probes = engine_def.get("probes", [])
+
+            if not probes:
+                continue
+
             try:
-                if await test_func():
-                    # Engine identified
-                    engine_info = self.engines.get(engine_id, {})
-                    engine_name = engine_info.get("name", engine_id)
+                # An engine matches if ANY of its probes succeeds
+                matched = False
+                for probe in probes:
+                    if await self._run_probe(probe):
+                        matched = True
+                        break
 
+                if matched:
                     self.printer.print_msg(
                         f"Identified GraphQL engine: {engine_name}", status="success"
                     )
 
-                    # Check for known CVEs
-                    cves = engine_info.get("cve", [])
+                    cves = engine_def.get("cve", [])
                     if cves:
                         cve_str = ", ".join(cves)
                         self.printer.print_msg(
-                            f"Known CVEs for this engine: {cve_str}", status="warning"
+                            f"Known CVEs for this engine: {cve_str}",
+                            status="warning",
                         )
-
-                        # Add as a finding
                         finding = Finding(
                             title=f"GraphQL Engine Identified: {engine_name}",
                             severity="LOW",
-                            description=f"The GraphQL engine was identified as {engine_name}. This implementation has known vulnerabilities: {cve_str}",
+                            description=(
+                                f"The GraphQL engine was identified as {engine_name}. "
+                                f"This implementation has known vulnerabilities: {cve_str}"
+                            ),
                             endpoint=self.client.endpoint,
                             impact="May be vulnerable to known exploits",
                             remediation="Update to the latest version of the GraphQL engine",
                         )
-                        self.findings.append(finding)
                     else:
-                        # Still add as informational finding
                         finding = Finding(
                             title=f"GraphQL Engine Identified: {engine_name}",
                             severity="INFO",
@@ -423,15 +220,17 @@ class Fingerprinter:
                             impact="None - informational only",
                             remediation="None required",
                         )
-                        self.findings.append(finding)
+
+                    self.findings.append(finding)
 
                     return {
                         "engine_id": engine_id,
                         "name": engine_name,
-                        "url": engine_info.get("url", ""),
-                        "technologies": engine_info.get("tech", []),
+                        "url": engine_def.get("url", ""),
+                        "technologies": engine_def.get("tech", []),
                         "cves": cves,
                     }
+
             except Exception as e:
                 self.printer.print_msg(
                     f"Error testing for {engine_id}: {str(e)}", status="error"
@@ -441,10 +240,4 @@ class Fingerprinter:
         return None
 
     def get_findings(self) -> List[Finding]:
-        """
-        Get all findings from fingerprinting.
-
-        Returns:
-            List[Finding]: List of findings
-        """
         return self.findings

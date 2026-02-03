@@ -1,0 +1,201 @@
+# GrapeQL Fingerprint Test Cases
+# Each entry defines one or more probe queries and the expected error
+# signature that identifies the engine.
+
+test_cases:
+  # ── Apollo Server ──────────────────────────────────────────────
+  - engine_id: apollo
+    name: Apollo Server
+    url: https://www.apollographql.com/
+    tech: [Node.js, JavaScript]
+    cve: [CVE-2023-30783, CVE-2022-21721]
+    probes:
+      - query: 'query @skip { __typename }'
+        expect_error: 'Directive "@skip" argument "if" of type "Boolean!" is required'
+      - query: 'query @deprecated { __typename }'
+        expect_error: 'Directive "@deprecated" may not be used on QUERY'
+
+  # ── GraphQL Yoga ───────────────────────────────────────────────
+  - engine_id: graphql-yoga
+    name: GraphQL Yoga
+    url: https://graphql-yoga.com/
+    tech: [Node.js, JavaScript]
+    cve: []
+    probes:
+      - query: 'subscription { __typename }'
+        expect_error_any:
+          - "asyncExecutionResult[Symbol.asyncIterator] is not a function"
+          - "Unexpected error."
+
+  # ── AWS AppSync ────────────────────────────────────────────────
+  - engine_id: aws-appsync
+    name: AWS AppSync
+    url: https://aws.amazon.com/appsync/
+    tech: [AWS]
+    cve: []
+    probes:
+      - query: 'query @skip { __typename }'
+        expect_error: MisplacedDirective
+
+  # ── Graphene (Python) ─────────────────────────────────────────
+  - engine_id: graphene
+    name: Graphene
+    url: https://graphene-python.org/
+    tech: [Python]
+    cve: []
+    probes:
+      - query: "aaa"
+        expect_error: "Syntax Error GraphQL (1:1)"
+
+  # ── Hasura ─────────────────────────────────────────────────────
+  - engine_id: hasura
+    name: Hasura GraphQL Engine
+    url: https://hasura.io/
+    tech: [Haskell]
+    cve: [CVE-2023-22465, CVE-2021-32675]
+    probes:
+      - query: 'query @cached { __typename }'
+        expect_data:
+          __typename: query_root
+      - query: 'query { aaa }'
+        expect_error: 'field "aaa" not found in type: ''query_root'''
+      - query: 'query @skip { __typename }'
+        expect_error: 'directive "skip" is not allowed on a query'
+      - query: 'query { __schema }'
+        expect_error: 'missing selection set for "__Schema"'
+
+  # ── GraphQL PHP ────────────────────────────────────────────────
+  - engine_id: graphql-php
+    name: GraphQL PHP
+    url: https://webonyx.github.io/graphql-php/
+    tech: [PHP]
+    cve: []
+    probes:
+      - query: 'query ! { __typename }'
+        expect_error: 'Syntax Error: Cannot parse the unexpected character "?"'
+      - query: 'query @deprecated { __typename }'
+        expect_error: 'Directive "deprecated" may not be used on "QUERY"'
+
+  # ── Ruby GraphQL ───────────────────────────────────────────────
+  - engine_id: ruby-graphql
+    name: Ruby GraphQL
+    url: https://graphql-ruby.org/
+    tech: [Ruby]
+    cve: []
+    probes:
+      - query: 'query @skip { __typename }'
+        expect_error_any:
+          - "'@skip' can't be applied to queries"
+          - "Directive 'skip' is missing required arguments: if"
+      - query: 'query @deprecated { __typename }'
+        expect_error: "'@deprecated' can't be applied to queries"
+      - query: 'query { __typename { }'
+        expect_error: 'Parse error on "}" (RCURLY)'
+
+  # ── Ariadne (Python) ──────────────────────────────────────────
+  - engine_id: ariadne
+    name: Ariadne
+    url: https://ariadnegraphql.org/
+    tech: [Python]
+    cve: []
+    probes:
+      - query: 'query { __typename @abc }'
+        expect_error: "Unknown directive '@abc'."
+        expect_no_data: true
+      - query: ""
+        expect_error: "The query must be a string."
+
+  # ── Strawberry (Python) ───────────────────────────────────────
+  - engine_id: strawberry
+    name: Strawberry GraphQL
+    url: https://strawberry.rocks/
+    tech: [Python]
+    cve: []
+    probes:
+      - query: 'query @deprecated { __typename }'
+        expect_error: "Directive '@deprecated' may not be used on query."
+        expect_has_data: true
+
+  # ── Juniper (Rust) ────────────────────────────────────────────
+  - engine_id: juniper
+    name: Juniper
+    url: https://graphql-rust.github.io/
+    tech: [Rust]
+    cve: []
+    probes:
+      - query: 'queryy { __typename }'
+        expect_error: 'Unexpected "queryy"'
+      - query: ""
+        expect_error: "Unexpected end of input"
+
+  # ── Lighthouse (PHP/Laravel) ──────────────────────────────────
+  - engine_id: lighthouse
+    name: Lighthouse
+    url: https://lighthouse-php.com/
+    tech: [PHP, Laravel]
+    cve: []
+    probes:
+      - query: 'query { __typename @include(if: falsee) }'
+        expect_error_any:
+          - "Internal server error"
+        expect_error_part:
+          part: category
+          value: internal
+
+  # ── Mercurius ─────────────────────────────────────────────────
+  - engine_id: mercurius
+    name: Mercurius
+    url: https://mercurius.dev/
+    tech: [Node.js, Fastify]
+    cve: []
+    probes: []
+
+  # ── Others (placeholders — add probes as research continues) ──
+  - engine_id: hypergraphql
+    name: HyperGraphQL
+    url: https://www.hypergraphql.org/
+    tech: [Java]
+    cve: []
+    probes: []
+
+  - engine_id: graphql-java
+    name: GraphQL Java
+    url: https://www.graphql-java.com/
+    tech: [Java]
+    cve: []
+    probes: []
+
+  - engine_id: gqlgen
+    name: gqlgen
+    url: https://gqlgen.com/
+    tech: [Go]
+    cve: []
+    probes: []
+
+  - engine_id: graphql-go
+    name: graphql-go
+    url: https://github.com/graphql-go/graphql
+    tech: [Go]
+    cve: []
+    probes: []
+
+  - engine_id: sangria
+    name: Sangria
+    url: https://sangria-graphql.github.io/
+    tech: [Scala]
+    cve: []
+    probes: []
+
+  - engine_id: graphql-api-for-wp
+    name: GraphQL API for WordPress
+    url: https://graphql-api.com/
+    tech: [PHP, WordPress]
+    cve: []
+    probes: []
+
+  - engine_id: wp-graphql
+    name: WPGraphQL
+    url: https://www.wpgraphql.com/
+    tech: [PHP, WordPress]
+    cve: []
+    probes: []
