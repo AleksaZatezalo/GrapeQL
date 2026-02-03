@@ -66,14 +66,25 @@ class InjectionTester(VulnerabilityTester):
             return self._sqli_cases
         # Fallback
         default_indicators = [
-            "SQL syntax", "SQLite", "MySQL", "PostgreSQL", "ORA-",
-            "SQL Server", "SQLSTATE[", "PG::Error:",
+            "SQL syntax",
+            "SQLite",
+            "MySQL",
+            "PostgreSQL",
+            "ORA-",
+            "SQL Server",
+            "SQLSTATE[",
+            "PG::Error:",
         ]
         return [
             {"name": p, "payload": p, "indicators": default_indicators}
             for p in [
-                "'", "' OR 1=1 --", "' OR '1'='1", "\" OR \"\"=\"",
-                "' UNION SELECT 1,2,3 --", "' AND 1=1 --", "' AND 1=0 --",
+                "'",
+                "' OR 1=1 --",
+                "' OR '1'='1",
+                '" OR ""="',
+                "' UNION SELECT 1,2,3 --",
+                "' AND 1=1 --",
+                "' AND 1=0 --",
             ]
         ]
 
@@ -82,14 +93,25 @@ class InjectionTester(VulnerabilityTester):
         if self._cmd_cases:
             return self._cmd_cases
         default_indicators = [
-            "root:", "/bin/bash", "/bin/sh", ":/home/", "/usr/bin",
-            "Permission denied", "command not found", "Linux",
+            "root:",
+            "/bin/bash",
+            "/bin/sh",
+            ":/home/",
+            "/usr/bin",
+            "Permission denied",
+            "command not found",
+            "Linux",
         ]
         return [
             {"name": p, "payload": p, "indicators": default_indicators}
             for p in [
-                ";id", "|id", "||id", "&& id",
-                ";cat /etc/passwd", "$(id)", "`id`",
+                ";id",
+                "|id",
+                "||id",
+                "&& id",
+                ";cat /etc/passwd",
+                "$(id)",
+                "`id`",
             ]
         ]
 
@@ -236,7 +258,9 @@ class InjectionTester(VulnerabilityTester):
                 if is_vuln:
                     severity = "CRITICAL"
                     if vuln_type == "SQLi":
-                        impact = "Database access, data extraction, authentication bypass"
+                        impact = (
+                            "Database access, data extraction, authentication bypass"
+                        )
                         remediation = "Use parameterized queries and ORM sanitization"
                     else:
                         impact = "Arbitrary command execution on the server"

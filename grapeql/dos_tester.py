@@ -123,7 +123,8 @@ class DosTester(VulnerabilityTester):
         scalar_fields = [
             f["name"]
             for f in self.types[self.query_type].get("fields", [])
-            if f.get("type", {}).get("name") in ["String", "Int", "Float", "Boolean", "ID"]
+            if f.get("type", {}).get("name")
+            in ["String", "Int", "Float", "Boolean", "ID"]
         ]
         if not scalar_fields:
             return ""
@@ -154,7 +155,8 @@ class DosTester(VulnerabilityTester):
         count = (cfg or {}).get("fragment_count", 50)
 
         usable = [
-            t for t, info in self.types.items()
+            t
+            for t, info in self.types.items()
             if t not in ("Query", "Mutation") and info.get("fields")
         ]
         if not usable:
@@ -170,7 +172,9 @@ class DosTester(VulnerabilityTester):
 
         return f"query FragmentBomb {{ {' '.join(spreads)} }}\n{chr(10).join(frags)}"
 
-    def generate_array_batching(self, cfg: Optional[Dict] = None) -> List[Dict[str, str]]:
+    def generate_array_batching(
+        self, cfg: Optional[Dict] = None
+    ) -> List[Dict[str, str]]:
         if not self.query_type or not self.types.get(self.query_type):
             return []
         batch_size = (cfg or {}).get("batch_size", 1000)
@@ -252,27 +256,47 @@ class DosTester(VulnerabilityTester):
         # Fallback: generate a default list if no YAML
         if not cases:
             cases = [
-                {"name": "circular_query", "title": "Circular Query DoS",
-                 "generator": "generate_circular_query", "severity": "HIGH",
-                 "impact": "Server resource exhaustion",
-                 "remediation": "Implement query depth/cost limits"},
-                {"name": "field_duplication", "title": "Field Duplication DoS",
-                 "generator": "generate_field_duplication", "severity": "HIGH",
-                 "impact": "Server resource exhaustion",
-                 "remediation": "Implement query depth/cost limits"},
-                {"name": "deep_nesting", "title": "Deeply Nested Query DoS",
-                 "generator": "generate_deeply_nested_query", "severity": "HIGH",
-                 "impact": "Server resource exhaustion",
-                 "remediation": "Implement query depth/cost limits"},
-                {"name": "fragment_bomb", "title": "Fragment Bomb DoS",
-                 "generator": "generate_fragment_bomb", "severity": "HIGH",
-                 "impact": "Server resource exhaustion",
-                 "remediation": "Implement query depth/cost limits"},
-                {"name": "array_batching", "title": "Array Batching DoS",
-                 "generator": "generate_array_batching", "severity": "HIGH",
-                 "send_as": "batch",
-                 "impact": "Server resource exhaustion via batch",
-                 "remediation": "Limit batch size"},
+                {
+                    "name": "circular_query",
+                    "title": "Circular Query DoS",
+                    "generator": "generate_circular_query",
+                    "severity": "HIGH",
+                    "impact": "Server resource exhaustion",
+                    "remediation": "Implement query depth/cost limits",
+                },
+                {
+                    "name": "field_duplication",
+                    "title": "Field Duplication DoS",
+                    "generator": "generate_field_duplication",
+                    "severity": "HIGH",
+                    "impact": "Server resource exhaustion",
+                    "remediation": "Implement query depth/cost limits",
+                },
+                {
+                    "name": "deep_nesting",
+                    "title": "Deeply Nested Query DoS",
+                    "generator": "generate_deeply_nested_query",
+                    "severity": "HIGH",
+                    "impact": "Server resource exhaustion",
+                    "remediation": "Implement query depth/cost limits",
+                },
+                {
+                    "name": "fragment_bomb",
+                    "title": "Fragment Bomb DoS",
+                    "generator": "generate_fragment_bomb",
+                    "severity": "HIGH",
+                    "impact": "Server resource exhaustion",
+                    "remediation": "Implement query depth/cost limits",
+                },
+                {
+                    "name": "array_batching",
+                    "title": "Array Batching DoS",
+                    "generator": "generate_array_batching",
+                    "severity": "HIGH",
+                    "send_as": "batch",
+                    "impact": "Server resource exhaustion via batch",
+                    "remediation": "Limit batch size",
+                },
             ]
 
         for tc in cases:

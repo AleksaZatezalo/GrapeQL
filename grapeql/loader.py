@@ -45,9 +45,7 @@ class TestCaseLoader:
         """
         self.root = os.path.abspath(test_cases_dir)
         if not os.path.isdir(self.root):
-            raise FileNotFoundError(
-                f"Test cases directory not found: {self.root}"
-            )
+            raise FileNotFoundError(f"Test cases directory not found: {self.root}")
 
     # ------------------------------------------------------------------ #
     #  Public API

@@ -243,9 +243,7 @@ class InfoTester(VulnerabilityTester):
                         f"Found issue: {finding.title}", status=status
                     )
                 else:
-                    self.printer.print_msg(
-                        f"{test_name} test passed", status="success"
-                    )
+                    self.printer.print_msg(f"{test_name} test passed", status="success")
             except Exception as e:
                 self.printer.print_msg(
                     f"Error testing {test_name}: {str(e)}", status="error"
