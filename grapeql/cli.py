@@ -187,27 +187,21 @@ Examples:
             # ── Parallel test execution ──────────────────────────
 
             async def run_fingerprint_test():
-                fp = Fingerprinter(
-                    logger=logger, loader=loader, baseline=baseline
-                )
+                fp = Fingerprinter(logger=logger, loader=loader, baseline=baseline)
                 if await fp.setup_endpoint(args.api, args.proxy, primary_client):
                     await fp.fingerprint()
                     with self.reporter_lock:
                         self.reporter.add_findings(fp.get_findings())
 
             async def run_info_test():
-                it = InfoTester(
-                    logger=logger, loader=loader, baseline=baseline
-                )
+                it = InfoTester(logger=logger, loader=loader, baseline=baseline)
                 if await it.setup_endpoint(args.api, args.proxy, primary_client):
                     await it.run_test()
                     with self.reporter_lock:
                         self.reporter.add_findings(it.get_findings())
 
             async def run_injection_test():
-                inj = InjectionTester(
-                    logger=logger, loader=loader, baseline=baseline
-                )
+                inj = InjectionTester(logger=logger, loader=loader, baseline=baseline)
                 if await inj.setup_endpoint(args.api, args.proxy, primary_client):
                     if args.username or args.password:
                         inj.set_credentials(
@@ -252,9 +246,7 @@ Examples:
                     "DoS testing enabled — server may become unresponsive",
                     status="warning",
                 )
-                dos = DosTester(
-                    logger=logger, loader=loader, baseline=baseline
-                )
+                dos = DosTester(logger=logger, loader=loader, baseline=baseline)
                 if await dos.setup_endpoint(args.api, args.proxy, primary_client):
                     await dos.run_test()
                     self.reporter.add_findings(dos.get_findings())

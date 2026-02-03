@@ -125,8 +125,7 @@ class Fingerprinter:
         # ── expect_error_any ─────────────────────────────────────
         if "expect_error_any" in probe:
             if not any(
-                self._error_contains(response, err)
-                for err in probe["expect_error_any"]
+                self._error_contains(response, err) for err in probe["expect_error_any"]
             ):
                 return False
 
