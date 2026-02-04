@@ -1,11 +1,9 @@
 """
 GrapeQL Command Line Interface
 Author: Aleksa Zatezalo
-Version: 3.1
+Version: 3.2
 Date: February 2025
 Description: CLI for GrapeQL GraphQL Security Testing Tool.
-             v3.1: Removed threading, added --modules for selective test execution,
-             --schema-file now always uses supplied schema (introspection tested but not required).
 """
 
 import asyncio
@@ -32,6 +30,18 @@ _DEFAULT_TEST_CASES_DIR = os.path.join(os.path.dirname(__file__), "test_cases")
 
 ALL_MODULES = {"fingerprint", "info", "injection", "auth", "dos"}
 
+MODULE_CLASSES = {
+    "fingerprint": Fingerprinter,
+    "info": InfoTester,
+    "injection": InjectionTester,
+    "auth": AuthTester,
+    "dos": DosTester,
+}
+
+# Execution order: baseline-producing modules first, then consumers
+EXECUTION_ORDER = ["fingerprint", "info", "injection", "auth", "dos"]
+
+
 class GrapeQL:
     """
     Main orchestrator for the GrapeQL CLI.
@@ -40,7 +50,8 @@ class GrapeQL:
         1. fingerprint  (populates baseline)
         2. info          (populates baseline)
         3. injection     (populates baseline)
-        4. dos           (reads baseline threshold)
+        4. auth          (populates baseline)
+        5. dos           (reads baseline threshold)
     """
 
     def __init__(self):
@@ -84,8 +95,8 @@ Examples:
             choices=sorted(ALL_MODULES),
             default=None,
             help=(
-                "Which test modules to run. Choices: dos, fingerprint, info, injection. "
-                "Default: fingerprint info injection (all except dos)."
+                "Which test modules to run. Choices: auth, dos, fingerprint, info, injection. "
+                "Default: fingerprint info injection auth (all except dos)."
             ),
         )
         parser.add_argument("--proxy", help="Proxy address (host:port)")
@@ -159,12 +170,9 @@ Examples:
         """
         Return an ordered list of modules to execute.
 
-        Execution order is always: fingerprint → info → injection → dos
-        regardless of the order the user specifies them.  This guarantees
-        the baseline is populated before DoS reads it.
+        Execution order is always: fingerprint → info → injection → auth → dos
+        regardless of the order the user specifies them.
         """
-        EXECUTION_ORDER = ["fingerprint", "info", "injection", "auth", "dos"]
-
         if args.modules is not None:
             requested: Set[str] = set(args.modules)
         else:
@@ -182,8 +190,7 @@ Examples:
 
         --schema-file supplied:
             1. Load the file into the client (authoritative source).
-            2. Probe live introspection as an informational check so the
-               info module can report whether introspection is enabled.
+            2. Probe live introspection as an informational check.
             3. Restore file-based schema regardless of probe result.
 
         --schema-file NOT supplied:
@@ -211,7 +218,6 @@ Examples:
                 )
                 return False
 
-            # Informational introspection probe
             self.printer.print_msg(
                 "Probing live introspection (informational only)…", status="log"
             )
@@ -225,7 +231,7 @@ Examples:
                     "Introspection is disabled or returned errors", status="log"
                 )
 
-            # Restore file-based schema (introspection probe may have overwritten it)
+            # Restore file-based schema
             client.load_schema_from_dict(schema_data)
             return True
 
@@ -240,53 +246,44 @@ Examples:
             return True
 
     # ------------------------------------------------------------------ #
-    #  Module runners
+    #  Generic module runner
     # ------------------------------------------------------------------ #
-    async def _run_auth(self, client, args, logger, loader, baseline):
-        self.printer.print_section("Authentication Testing")
-        auth = AuthTester(logger=logger, loader=loader, baseline=baseline)
-        if await auth.setup_endpoint(args.api, args.proxy, client):
-            if args.auth:
-                auth.set_auth_headers({"Authorization": f"{args.auth_type} {args.auth}"})
-            await auth.run_test()
-            self.reporter.add_findings(auth.get_findings())
-    
-    async def _run_fingerprint(self, client, args, logger, loader, baseline):
-        self.printer.print_section("Fingerprinting")
-        fp = Fingerprinter(logger=logger, loader=loader, baseline=baseline)
-        if await fp.setup_endpoint(args.api, args.proxy, client):
-            await fp.fingerprint()
-            self.reporter.add_findings(fp.get_findings())
 
-    async def _run_info(self, client, args, logger, loader, baseline):
-        self.printer.print_section("Information Disclosure")
-        it = InfoTester(logger=logger, loader=loader, baseline=baseline)
-        if await it.setup_endpoint(args.api, args.proxy, client):
-            await it.run_test()
-            self.reporter.add_findings(it.get_findings())
+    async def _run_module(self, module_name, client, args, logger, loader, baseline):
+        """Instantiate and run any test module by name."""
+        cls = MODULE_CLASSES[module_name]
+        self.printer.print_section(module_name.replace("_", " ").title() + " Testing")
 
-    async def _run_injection(self, client, args, logger, loader, baseline):
-        self.printer.print_section("Injection Testing")
-        inj = InjectionTester(logger=logger, loader=loader, baseline=baseline)
-        if await inj.setup_endpoint(args.api, args.proxy, client):
-            if args.username or args.password:
-                inj.set_credentials(
-                    args.username or "admin",
-                    args.password or "changeme",
+        if module_name == "dos":
+            self.printer.print_msg(
+                "DoS testing enabled — server may become unresponsive",
+                status="warning",
+            )
+
+        instance = cls(logger=logger, loader=loader, baseline=baseline)
+
+        if not await instance.setup_endpoint(args.api, args.proxy, client):
+            return
+
+        # Apply auth headers where relevant
+        if args.auth:
+            if module_name == "auth":
+                instance.set_auth_headers(
+                    {"Authorization": f"{args.auth_type} {args.auth}"}
                 )
-            await inj.run_test()
-            self.reporter.add_findings(inj.get_findings())
+            # All modules get the auth header on their client via the
+            # pre_configured_client copy, but auth_tester needs it separately
+            # for its baseline comparison logic.
 
-    async def _run_dos(self, client, args, logger, loader, baseline):
-        self.printer.print_section("Denial of Service")
-        self.printer.print_msg(
-            "DoS testing enabled — server may become unresponsive",
-            status="warning",
-        )
-        dos = DosTester(logger=logger, loader=loader, baseline=baseline)
-        if await dos.setup_endpoint(args.api, args.proxy, client):
-            await dos.run_test()
-            self.reporter.add_findings(dos.get_findings())
+        # Apply credentials for injection testing
+        if hasattr(instance, "set_credentials") and (args.username or args.password):
+            instance.set_credentials(
+                args.username or "admin",
+                args.password or "changeme",
+            )
+
+        await instance.run_test()
+        self.reporter.add_findings(instance.get_findings())
 
     # ------------------------------------------------------------------ #
     #  Main
@@ -297,7 +294,7 @@ Examples:
             args = self.parse_arguments()
             self.printer.intro()
 
-            # ── Shared infrastructure ────────────────────────────
+            # — Shared infrastructure —
             logger = GrapeLogger(log_file=args.log_file)
             loader = TestCaseLoader(args.test_cases)
             baseline = BaselineTracker()
@@ -305,7 +302,7 @@ Examples:
             self.reporter.set_target(args.api)
             self.printer.print_section(f"Testing endpoint: {args.api}")
 
-            # ── Build primary client + load schema ───────────────
+            # — Build primary client + load schema —
             primary_client = GraphQLClient(logger=logger)
             primary_client.set_endpoint(args.api)
             self._configure_client(primary_client, args)
@@ -313,26 +310,18 @@ Examples:
             if not await self._load_schema(primary_client, args):
                 return 1
 
-            # ── Resolve and execute modules sequentially ─────────
+            # — Resolve and execute modules sequentially —
             modules = self._resolve_modules(args)
             self.printer.print_msg(
                 f"Modules: {', '.join(modules)}", status="log"
             )
 
-            dispatch = {
-                "fingerprint": self._run_fingerprint,
-                "info": self._run_info,
-                "injection": self._run_injection,
-                "auth": self._run_auth,
-                "dos": self._run_dos,
-            }
-
             for module_name in modules:
-                await dispatch[module_name](
-                    primary_client, args, logger, loader, baseline
+                await self._run_module(
+                    module_name, primary_client, args, logger, loader, baseline
                 )
 
-            # ── Baseline summary ─────────────────────────────────
+            # — Baseline summary —
             summary = baseline.summary()
             agg = summary.get("_aggregate", {})
             if agg.get("count", 0) > 0:
@@ -342,7 +331,7 @@ Examples:
                     status="log",
                 )
 
-            # ── Report ───────────────────────────────────────────
+            # — Report —
             if args.report:
                 self.reporter.generate_report(
                     output_format=args.report_format, output_file=args.report

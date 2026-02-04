@@ -1,78 +1,34 @@
 """
 GrapeQL Fingerprinting Module
 Author: Aleksa Zatezalo
-Version: 3.0
+Version: 3.1
 Date: February 2025
 Description: Fingerprinting module to identify GraphQL engine implementations.
              Engine probe definitions are loaded from YAML test cases.
 """
 
-from typing import Dict, List, Optional, Tuple, Set, Any
-from .client import GraphQLClient
-from .utils import GrapePrinter, Finding
-from .logger import GrapeLogger
-from .loader import TestCaseLoader
-from .baseline import BaselineTracker
-
 import time
+from typing import Dict, List, Optional, Any
+from .tester import VulnerabilityTester
+from .utils import Finding
 
 
-class Fingerprinter:
+class Fingerprinter(VulnerabilityTester):
     """
     Identifies GraphQL server implementations through behavioral fingerprinting.
     Probe queries and expected signatures are loaded from YAML test cases.
+
+    Inherits client, logger, baseline, printer, and findings management
+    from VulnerabilityTester.
     """
 
     MODULE_NAME = "fingerprint"
 
-    def __init__(
-        self,
-        logger: Optional[GrapeLogger] = None,
-        loader: Optional[TestCaseLoader] = None,
-        baseline: Optional[BaselineTracker] = None,
-    ):
-        self.client = GraphQLClient(logger=logger)
-        self.printer = GrapePrinter()
-        self.logger = logger
-        self.baseline = baseline
-        self.findings: List[Finding] = []
-
-        # Load engine definitions from YAML (falls back to empty list)
-        self.engines: List[Dict[str, Any]] = []
-        if loader:
-            self.engines = loader.load_module(self.MODULE_NAME)
-
-    # ------------------------------------------------------------------ #
-    #  Setup
-    # ------------------------------------------------------------------ #
-
-    async def setup_endpoint(
-        self,
-        endpoint: str,
-        proxy: Optional[str] = None,
-        pre_configured_client: Optional[GraphQLClient] = None,
-    ) -> bool:
-        if pre_configured_client:
-            self.client.endpoint = pre_configured_client.endpoint
-            self.client.proxy_url = pre_configured_client.proxy_url
-            self.client.headers = pre_configured_client.headers.copy()
-            self.client.cookies = pre_configured_client.cookies.copy()
-            self.client.auth_token = pre_configured_client.auth_token
-            self.client.schema = pre_configured_client.schema
-            self.client.query_fields = (
-                pre_configured_client.query_fields.copy()
-                if pre_configured_client.query_fields
-                else {}
-            )
-            self.client.mutation_fields = (
-                pre_configured_client.mutation_fields.copy()
-                if pre_configured_client.mutation_fields
-                else {}
-            )
-            if pre_configured_client.schema:
-                return True
-
-        return await self.client.setup_endpoint(endpoint, proxy)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.test_name = "GraphQL Fingerprinting"
+        # test_cases are auto-loaded by VulnerabilityTester from YAML
+        self.engines: List[Dict[str, Any]] = self.test_cases
 
     # ------------------------------------------------------------------ #
     #  Probe helpers
@@ -109,40 +65,32 @@ class Fingerprinter:
             _log_payload=query[:100],
         )
         duration = time.time() - start
-
-        # Record baseline
-        if self.baseline:
-            self.baseline.record("Fingerprinter", duration)
+        self._record_response_time(duration)
 
         if not response:
             return False
 
-        # ── expect_error ─────────────────────────────────────────
         if "expect_error" in probe:
             if not self._error_contains(response, probe["expect_error"]):
                 return False
 
-        # ── expect_error_any ─────────────────────────────────────
         if "expect_error_any" in probe:
             if not any(
                 self._error_contains(response, err) for err in probe["expect_error_any"]
             ):
                 return False
 
-        # ── expect_error_part ────────────────────────────────────
         if "expect_error_part" in probe:
             eep = probe["expect_error_part"]
             if not self._error_contains(response, eep["value"], part=eep["part"]):
                 return False
 
-        # ── expect_data ──────────────────────────────────────────
         if "expect_data" in probe:
             data = response.get("data", {})
             for key, val in probe["expect_data"].items():
                 if data.get(key) != val:
                     return False
 
-        # ── expect_has_data / expect_no_data ─────────────────────
         if probe.get("expect_has_data") and "data" not in response:
             return False
         if probe.get("expect_no_data") and "data" in response:
@@ -151,13 +99,11 @@ class Fingerprinter:
         return True
 
     # ------------------------------------------------------------------ #
-    #  Main fingerprint loop
+    #  Main fingerprint loop (also serves as run_test)
     # ------------------------------------------------------------------ #
 
     async def fingerprint(self) -> Optional[Dict]:
-        """
-        Identify the GraphQL engine by running YAML-defined probes.
-        """
+        """Identify the GraphQL engine by running YAML-defined probes."""
         self.printer.print_section("Fingerprinting GraphQL Engine")
 
         if not self.client.endpoint:
@@ -180,10 +126,9 @@ class Fingerprinter:
                 continue
 
             try:
-                # An engine matches if ANY of its probes succeeds
                 matched = False
-                for probe in probes:
-                    if await self._run_probe(probe):
+                for p in probes:
+                    if await self._run_probe(p):
                         matched = True
                         break
 
@@ -220,7 +165,7 @@ class Fingerprinter:
                             remediation="None required",
                         )
 
-                    self.findings.append(finding)
+                    self.add_finding(finding)
 
                     return {
                         "engine_id": engine_id,
@@ -238,5 +183,7 @@ class Fingerprinter:
         self.printer.print_msg("Could not identify GraphQL engine", status="warning")
         return None
 
-    def get_findings(self) -> List[Finding]:
+    async def run_test(self) -> List[Finding]:
+        """VulnerabilityTester interface — delegates to fingerprint()."""
+        await self.fingerprint()
         return self.findings

@@ -1,40 +1,34 @@
 """
 GrapeQL Utilities
 Author: Aleksa Zatezalo
-Version: 3.0
+Version: 3.1
 Date: February 2025
 Description: Utility functions and classes for GrapeQL
 """
 
 import time
-from typing import Dict, List, Optional, Any, Union
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional
 
 
 class GrapePrinter:
     """
-    A class for handling colored console output formatting for the GrapeQL tool.
-    Provides methods for printing formatted messages, banners, and notifications.
+    Colored console output formatting for the GrapeQL tool.
     """
 
-    def __init__(self):
-        """
-        Initialize the GrapePrinter class with ANSI color and style codes.
-        """
-        self.PURPLE = "\033[95m"
-        self.CYAN = "\033[96m"
-        self.DARKCYAN = "\033[36m"
-        self.BLUE = "\033[94m"
-        self.GREEN = "\033[92m"
-        self.YELLOW = "\033[93m"
-        self.RED = "\033[91m"
-        self.BOLD = "\033[1m"
-        self.UNDERLINE = "\033[4m"
-        self.END = "\033[0m"
+    PURPLE = "\033[95m"
+    CYAN = "\033[96m"
+    DARKCYAN = "\033[36m"
+    BLUE = "\033[94m"
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+    RED = "\033[91m"
+    BOLD = "\033[1m"
+    UNDERLINE = "\033[4m"
+    END = "\033[0m"
 
     def print_grapes(self):
-        """
-        Print the GrapeQL ASCII art logo in purple.
-        """
+        """Print the GrapeQL ASCII art logo."""
         print(
             self.PURPLE
             + self.BOLD
@@ -53,40 +47,28 @@ class GrapePrinter:
         )
 
     def print_title(self):
-        """
-        Print the GrapeQL title and author information.
-        """
+        """Print the GrapeQL title and author information."""
         print(self.PURPLE + self.BOLD + "GrapeQL By Aleksa Zatezalo\n\n" + self.END)
 
     def print_msg(self, message: str, status: str = "log"):
         """
-        Print a formatted message with appropriate status indicators and colors.
+        Print a formatted message with status indicator.
 
         Args:
             message: The message text to display
-            status: The type of message to display. Valid options are:
-                - "success" (green with [+])
-                - "warning" (yellow with [!])
-                - "error" or "failed" (red with [-])
-                - "log" (cyan with [!], default)
+            status: "success", "warning", "error"/"failed", or "log" (default)
         """
-        plus = "\n[+] "
-        exclaim = "[!] "
-        fail = "[-] "
-
         if status == "success":
-            print(self.GREEN + plus + message + self.END)
+            print(self.GREEN + "\n[+] " + message + self.END)
         elif status == "warning":
-            print(self.YELLOW + exclaim + message + self.END)
-        elif status in ["error", "failed"]:
-            print(self.RED + fail + message + self.END)
-        else:  # default to log
-            print(self.CYAN + exclaim + message + self.END)
+            print(self.YELLOW + "[!] " + message + self.END)
+        elif status in ("error", "failed"):
+            print(self.RED + "[-] " + message + self.END)
+        else:
+            print(self.CYAN + "[!] " + message + self.END)
 
     def print_notify(self):
-        """
-        Display example notifications for different message types.
-        """
+        """Display example notifications for different message types."""
         time.sleep(0.25)
         print(self.BOLD + "EXAMPLE NOTIFICATIONS:" + self.END)
         time.sleep(0.5)
@@ -100,9 +82,7 @@ class GrapePrinter:
         time.sleep(0.5)
 
     def intro(self):
-        """
-        Display the complete GrapeQL introduction sequence.
-        """
+        """Display the complete GrapeQL introduction sequence."""
         self.print_grapes()
         self.print_title()
         self.print_notify()
@@ -110,70 +90,34 @@ class GrapePrinter:
     def print_vulnerability(
         self, title: str, severity: str, details: Optional[str] = None
     ):
-        """
-        Print a formatted vulnerability finding.
-
-        Args:
-            title: The vulnerability title
-            severity: Severity level (LOW, MEDIUM, HIGH, CRITICAL)
-            details: Optional details about the vulnerability
-        """
+        """Print a formatted vulnerability finding."""
         severity = severity.upper()
-
-        if severity == "HIGH" or severity == "CRITICAL":
-            color = self.RED
-        elif severity == "MEDIUM":
-            color = self.YELLOW
-        else:
-            color = self.BLUE
-
+        color = self.RED if severity in ("HIGH", "CRITICAL") else (
+            self.YELLOW if severity == "MEDIUM" else self.BLUE
+        )
         print(f"\n{color}{self.BOLD}[{severity}] {title}{self.END}")
-
         if details:
             print(f"  {details}")
 
     def print_section(self, title: str):
-        """
-        Print a section header.
-
-        Args:
-            title: Section title
-        """
+        """Print a section header."""
         print(f"\n{self.BOLD}{self.PURPLE}=== {title} ==={self.END}\n")
 
 
+@dataclass
 class Finding:
-    """
-    Represents a security finding/vulnerability with standardized attributes.
-    """
+    """Represents a security finding/vulnerability with standardized attributes."""
 
-    def __init__(
-        self,
-        title: str,
-        severity: str,
-        description: str,
-        endpoint: str,
-        impact: Optional[str] = None,
-        remediation: Optional[str] = None,
-    ):
-        """
-        Initialize a new finding.
+    title: str
+    severity: str
+    description: str
+    endpoint: str
+    impact: Optional[str] = None
+    remediation: Optional[str] = None
+    timestamp: str = field(default_factory=lambda: time.strftime("%Y-%m-%d %H:%M:%S"))
 
-        Args:
-            title: Title of the finding
-            severity: Severity level (LOW, MEDIUM, HIGH, CRITICAL)
-            description: Description of the finding
-            endpoint: Affected endpoint
-            impact: Optional impact description
-            remediation: Optional remediation instructions
-        """
-        self.title = title
-        self.severity = severity.upper()
-        self.description = description
-        self.endpoint = endpoint
-        self.impact = impact
-        self.remediation = remediation
-        self.timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    def __post_init__(self):
+        self.severity = self.severity.upper()
 
     def to_dict(self) -> Dict:
         """Convert finding to dictionary representation."""
@@ -188,43 +132,4 @@ class Finding:
         }
 
     def __str__(self) -> str:
-        """String representation of the finding."""
         return f"{self.severity} - {self.title} - {self.endpoint}"
-
-
-def load_wordlist(path: str) -> List[str]:
-    """
-    Load a wordlist file into a list of strings.
-
-    Args:
-        path: Path to wordlist file
-
-    Returns:
-        List[str]: Lines from the wordlist file
-    """
-    try:
-        with open(path, "r") as f:
-            return [line.strip() for line in f if line.strip()]
-    except Exception as e:
-        print(f"Error loading wordlist from {path}: {str(e)}")
-        return []
-
-
-def load_json_file(path: str) -> Optional[Dict]:
-    """
-    Load and parse a JSON file.
-
-    Args:
-        path: Path to JSON file
-
-    Returns:
-        Optional[Dict]: Parsed JSON data or None on error
-    """
-    try:
-        with open(path, "r") as f:
-            import json
-
-            return json.load(f)
-    except Exception as e:
-        print(f"Error loading JSON from {path}: {str(e)}")
-        return None
