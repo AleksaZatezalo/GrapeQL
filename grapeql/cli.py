@@ -1,10 +1,11 @@
 """
 GrapeQL Command Line Interface
 Author: Aleksa Zatezalo
-Version: 3.3
+Version: 3.4
 Date: February 2025
 Description: CLI for GrapeQL GraphQL Security Testing Tool.
              v3.3: Added --listener-ip / --listener-port for OOB testing.
+             v3.4: Added --ai-key / --ai-message for AI-assisted analysis.
 """
 
 import asyncio
@@ -15,6 +16,7 @@ import sys
 from typing import List, Set
 
 from .utils import GrapePrinter
+from .ai_agent import AIAgent
 from .auth_tester import AuthTester
 from .client import GraphQLClient
 from .fingerprint import Fingerprinter
@@ -88,6 +90,15 @@ Examples:
   # Combine: specific modules + supplied schema + logging
   grapeql --api https://example.com/graphql \\
       --modules injection --schema-file schema.json --log-file scan.log
+
+  # Full scan with AI-assisted analysis
+  grapeql --api https://example.com/graphql \\
+      --report report.md --ai-key sk-ant-...
+
+  # AI analysis with operator guidance
+  grapeql --api https://example.com/graphql \\
+      --report report.md --ai-key sk-ant-... \\
+      --ai-message "Focus on SSRF and auth bypass chains"
             """,
         )
 
@@ -156,6 +167,23 @@ Examples:
             help=(
                 "Port for the local OOB callback listener. "
                 "Enables out-of-band injection testing when used with --listener-ip."
+            ),
+        )
+
+        # ── AI analysis ─────────────────────────────────────────────
+        parser.add_argument(
+            "--ai-key",
+            help=(
+                "Anthropic API key for AI-assisted analysis.  When provided, "
+                "findings are sent to Claude for an executive summary and "
+                "recommended next steps appended to the report."
+            ),
+        )
+        parser.add_argument(
+            "--ai-message",
+            help=(
+                "Optional free-form message passed to the AI agent to guide "
+                "its analysis (e.g. 'Focus on SSRF chains' or 'Ignore info findings')."
             ),
         )
 
@@ -361,6 +389,17 @@ Examples:
                     f"avg={agg['mean']:.3f}s, stddev={agg['stddev']:.3f}s",
                     status="log",
                 )
+
+            # -- AI analysis (optional) --
+            if args.ai_key:
+                agent = AIAgent(api_key=args.ai_key)
+                ai_summary = await agent.analyse(
+                    target=args.api,
+                    findings=self.reporter.findings,
+                    message=args.ai_message,
+                )
+                if ai_summary:
+                    self.reporter.set_ai_summary(ai_summary)
 
             # -- Report --
             if args.report:

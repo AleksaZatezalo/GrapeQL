@@ -1,9 +1,10 @@
 """
 GrapeQL Reporter
 Author: Aleksa Zatezalo
-Version: 2.1
-Date: April 2025
+Version: 2.2
+Date: February 2025
 Description: Report generation for GrapeQL findings.
+             v2.2: Added AI analysis section support.
 """
 
 import os
@@ -24,9 +25,14 @@ class Reporter:
         self.findings: List[Finding] = []
         self.target = "unknown"
         self.scan_time = time.strftime("%Y-%m-%d_%H-%M-%S")
+        self._ai_summary: Optional[str] = None
 
     def set_target(self, target: str) -> None:
         self.target = target
+
+    def set_ai_summary(self, summary: str) -> None:
+        """Store the AI-generated analysis section for inclusion in reports."""
+        self._ai_summary = summary
 
     def add_findings(self, findings: List[Finding]) -> None:
         for finding in findings:
@@ -97,6 +103,10 @@ class Reporter:
                         f"{finding.title} - {finding.endpoint}{self.printer.END}"
                     )
 
+        if self._ai_summary:
+            self.printer.print_section("AI Analysis")
+            print(self._ai_summary)
+
     # ------------------------------------------------------------------ #
     #  Markdown report
     # ------------------------------------------------------------------ #
@@ -148,6 +158,12 @@ GrapeQL conducted a security assessment of the GraphQL API at {self.target}. Thi
                 report += f"- {title}\n"
             report += "\n"
 
+        # AI Analysis section (appended after remediation summary)
+        if self._ai_summary:
+            report += "\n---\n\n"
+            report += self._ai_summary
+            report += "\n"
+
         try:
             os.makedirs(os.path.dirname(output_file) or ".", exist_ok=True)
             with open(output_file, "w") as fh:
@@ -167,6 +183,9 @@ GrapeQL conducted a security assessment of the GraphQL API at {self.target}. Thi
             "findings_count": len(self.findings),
             "findings": [f.to_dict() for f in self.findings],
         }
+
+        if self._ai_summary:
+            report_data["ai_analysis"] = self._ai_summary
 
         try:
             os.makedirs(os.path.dirname(output_file) or ".", exist_ok=True)
