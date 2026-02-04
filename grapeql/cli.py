@@ -1,9 +1,10 @@
 """
 GrapeQL Command Line Interface
 Author: Aleksa Zatezalo
-Version: 3.2
+Version: 3.3
 Date: February 2025
 Description: CLI for GrapeQL GraphQL Security Testing Tool.
+             v3.3: Added --listener-ip / --listener-port for OOB testing.
 """
 
 import asyncio
@@ -77,6 +78,10 @@ Examples:
   # Full scan including DoS
   grapeql --api https://example.com/graphql --modules fingerprint info injection dos
 
+  # Injection with OOB listener
+  grapeql --api https://example.com/graphql \\
+      --modules injection --listener-ip 10.0.0.5 --listener-port 4444
+
   # Use a pre-captured schema (introspection is still probed but not required)
   grapeql --api https://example.com/graphql --schema-file schema.json
 
@@ -137,6 +142,23 @@ Examples:
             ),
         )
 
+        # ── OOB listener ────────────────────────────────────────────
+        parser.add_argument(
+            "--listener-ip",
+            help=(
+                "IP address for the local OOB callback listener. "
+                "Enables out-of-band injection testing when used with --listener-port."
+            ),
+        )
+        parser.add_argument(
+            "--listener-port",
+            type=int,
+            help=(
+                "Port for the local OOB callback listener. "
+                "Enables out-of-band injection testing when used with --listener-ip."
+            ),
+        )
+
         return parser.parse_args()
 
     # ------------------------------------------------------------------ #
@@ -170,7 +192,7 @@ Examples:
         """
         Return an ordered list of modules to execute.
 
-        Execution order is always: fingerprint → info → injection → auth → dos
+        Execution order is always: fingerprint -> info -> injection -> auth -> dos
         regardless of the order the user specifies them.
         """
         if args.modules is not None:
@@ -219,7 +241,7 @@ Examples:
                 return False
 
             self.printer.print_msg(
-                "Probing live introspection (informational only)…", status="log"
+                "Probing live introspection (informational only)...", status="log"
             )
             introspection_enabled = await client.introspection_query()
             if introspection_enabled:
@@ -238,7 +260,7 @@ Examples:
         else:
             if not await client.introspection_query():
                 self.printer.print_msg(
-                    "Introspection failed — supply a schema with --schema-file "
+                    "Introspection failed -- supply a schema with --schema-file "
                     "or ensure introspection is enabled",
                     status="error",
                 )
@@ -256,7 +278,7 @@ Examples:
 
         if module_name == "dos":
             self.printer.print_msg(
-                "DoS testing enabled — server may become unresponsive",
+                "DoS testing enabled -- server may become unresponsive",
                 status="warning",
             )
 
@@ -271,9 +293,6 @@ Examples:
                 instance.set_auth_headers(
                     {"Authorization": f"{args.auth_type} {args.auth}"}
                 )
-            # All modules get the auth header on their client via the
-            # pre_configured_client copy, but auth_tester needs it separately
-            # for its baseline comparison logic.
 
         # Apply credentials for injection testing
         if hasattr(instance, "set_credentials") and (args.username or args.password):
@@ -281,6 +300,10 @@ Examples:
                 args.username or "admin",
                 args.password or "changeme",
             )
+
+        # Apply OOB listener config to injection tester
+        if module_name == "injection" and args.listener_ip and args.listener_port:
+            instance.set_listener(args.listener_ip, args.listener_port)
 
         await instance.run_test()
         self.reporter.add_findings(instance.get_findings())
@@ -294,7 +317,15 @@ Examples:
             args = self.parse_arguments()
             self.printer.intro()
 
-            # — Shared infrastructure —
+            # Validate listener args come as a pair
+            if bool(args.listener_ip) != bool(args.listener_port):
+                self.printer.print_msg(
+                    "--listener-ip and --listener-port must be used together",
+                    status="error",
+                )
+                return 1
+
+            # -- Shared infrastructure --
             logger = GrapeLogger(log_file=args.log_file)
             loader = TestCaseLoader(args.test_cases)
             baseline = BaselineTracker()
@@ -302,7 +333,7 @@ Examples:
             self.reporter.set_target(args.api)
             self.printer.print_section(f"Testing endpoint: {args.api}")
 
-            # — Build primary client + load schema —
+            # -- Build primary client + load schema --
             primary_client = GraphQLClient(logger=logger)
             primary_client.set_endpoint(args.api)
             self._configure_client(primary_client, args)
@@ -310,7 +341,7 @@ Examples:
             if not await self._load_schema(primary_client, args):
                 return 1
 
-            # — Resolve and execute modules sequentially —
+            # -- Resolve and execute modules sequentially --
             modules = self._resolve_modules(args)
             self.printer.print_msg(
                 f"Modules: {', '.join(modules)}", status="log"
@@ -321,7 +352,7 @@ Examples:
                     module_name, primary_client, args, logger, loader, baseline
                 )
 
-            # — Baseline summary —
+            # -- Baseline summary --
             summary = baseline.summary()
             agg = summary.get("_aggregate", {})
             if agg.get("count", 0) > 0:
@@ -331,7 +362,7 @@ Examples:
                     status="log",
                 )
 
-            # — Report —
+            # -- Report --
             if args.report:
                 self.reporter.generate_report(
                     output_format=args.report_format, output_file=args.report
