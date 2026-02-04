@@ -1,7 +1,7 @@
 """
 GrapeQL DoS Tester
 Author: Aleksa Zatezalo
-Version: 3.0
+Version: 3.1
 Date: February 2025
 Description: Tests GraphQL endpoints for Denial of Service vulnerabilities.
              Attack configurations are loaded from YAML. Uses the baseline
@@ -15,9 +15,6 @@ from typing import Dict, List, Optional, Tuple, Any
 from .tester import VulnerabilityTester
 from .utils import Finding
 from .client import GraphQLClient
-from .logger import GrapeLogger
-from .loader import TestCaseLoader
-from .baseline import BaselineTracker
 
 
 class DosTester(VulnerabilityTester):
@@ -30,13 +27,8 @@ class DosTester(VulnerabilityTester):
 
     MODULE_NAME = "dos"
 
-    def __init__(
-        self,
-        logger: Optional[GrapeLogger] = None,
-        loader: Optional[TestCaseLoader] = None,
-        baseline: Optional[BaselineTracker] = None,
-    ):
-        super().__init__(logger=logger, loader=loader, baseline=baseline)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.test_name = "GraphQL DoS Testing"
         self.types: Dict[str, Dict] = {}
         self.query_type: Optional[str] = None
@@ -63,14 +55,6 @@ class DosTester(VulnerabilityTester):
     # ------------------------------------------------------------------ #
 
     def _get_threshold(self) -> float:
-        """
-        Return the response-time threshold (seconds) above which a
-        response is considered a DoS indicator.
-
-        If a baseline tracker with samples is available:
-            threshold = max(5.0, mean + 3 * stddev)
-        Otherwise falls back to a hard 5.0 s floor.
-        """
         if self.baseline and self.baseline.has_baseline():
             threshold = self.baseline.get_dos_threshold(min_threshold=5.0)
             self.printer.print_msg(
@@ -185,7 +169,6 @@ class DosTester(VulnerabilityTester):
         first = fields[0]["name"]
         return [{"query": f"query {{ {first} {{ id }} }}"} for _ in range(batch_size)]
 
-    # Map generator names (from YAML) to methods
     _GENERATORS = {
         "generate_circular_query": generate_circular_query,
         "generate_field_duplication": generate_field_duplication,
@@ -201,7 +184,6 @@ class DosTester(VulnerabilityTester):
     async def _test_single_query(
         self, query: str, test_name: str, threshold: float
     ) -> Tuple[bool, float]:
-        """Send query, return (is_vulnerable, duration)."""
         if not query:
             return False, 0.0
 
@@ -250,10 +232,8 @@ class DosTester(VulnerabilityTester):
 
         threshold = self._get_threshold()
 
-        # If we have YAML test cases, drive from them
         cases = self.test_cases if self.test_cases else []
 
-        # Fallback: generate a default list if no YAML
         if not cases:
             cases = [
                 {
@@ -360,7 +340,7 @@ class DosTester(VulnerabilityTester):
                     f"Response time: {duration:.2f}s (threshold: {threshold:.2f}s)",
                     status="failed",
                 )
-                finding = Finding(
+                self.add_finding(Finding(
                     title=f"DoS Vulnerability: {test_name}",
                     severity=tc.get("severity", "HIGH"),
                     description=(
@@ -370,9 +350,7 @@ class DosTester(VulnerabilityTester):
                     endpoint=self.client.endpoint,
                     impact=tc.get("impact", "Service disruption"),
                     remediation=tc.get("remediation", "Implement query cost analysis"),
-                )
-                self.findings.append(finding)
-                self.add_finding(finding)
+                ))
             else:
                 self.printer.print_msg(
                     f"NOT vulnerable to {test_name} ({duration:.2f}s)",

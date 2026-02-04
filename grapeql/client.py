@@ -1,16 +1,16 @@
 """
 GrapeQL HTTP Client
 Author: Aleksa Zatezalo
-Version: 3.0
+Version: 3.1
 Date: February 2025
-Description: Core HTTP client for GrapeQL with consistent request handling and structured logging
+Description: Core HTTP client for GrapeQL with consistent request handling and structured logging.
 """
 
 import aiohttp
 import asyncio
 import json
 import time
-from typing import Dict, List, Optional, Any, Tuple, Union
+from typing import Dict, List, Optional, Any, Tuple
 from .utils import GrapePrinter
 from .logger import GrapeLogger
 
@@ -23,7 +23,6 @@ class GraphQLClient:
     """
 
     def __init__(self, logger: Optional[GrapeLogger] = None):
-        """Initialize the GraphQL client with default settings."""
         self.printer = GrapePrinter()
         self.logger = logger
         self.endpoint: Optional[str] = None
@@ -37,17 +36,15 @@ class GraphQLClient:
         self.query_fields: Dict[str, Dict] = {}
         self.mutation_fields: Dict[str, Dict] = {}
 
-        # Caller can set these so log records have proper context
         self._log_module: str = "GraphQLClient"
         self._log_test: str = "-"
 
     def set_log_context(self, module: str, test: str = "-") -> None:
-        """Set the module/test name used in log records for subsequent requests."""
         self._log_module = module
         self._log_test = test
 
     # ------------------------------------------------------------------ #
-    # Configuration helpers (unchanged API)
+    # Configuration helpers
     # ------------------------------------------------------------------ #
 
     def configure_proxy(self, proxy_host: str, proxy_port: int) -> None:
@@ -93,12 +90,7 @@ class GraphQLClient:
         _log_payload: str = "-",
         **kwargs,
     ) -> Tuple[Optional[Dict], Optional[str]]:
-        """
-        Make a generic HTTP request with consistent error handling and logging.
-
-        Private keyword args ``_log_parameter`` and ``_log_payload`` are stripped
-        before forwarding to aiohttp — they exist solely for structured logging.
-        """
+        """Make a generic HTTP request with consistent error handling and logging."""
         if not url and not self.endpoint:
             error_msg = "No endpoint URL provided"
             self.printer.print_msg(error_msg, status="error")
@@ -133,7 +125,6 @@ class GraphQLClient:
                         except json.JSONDecodeError:
                             result = {"text": text}
 
-                    # Log success
                     if self.logger:
                         self.logger.log_request(
                             module=self._log_module,
@@ -185,40 +176,49 @@ class GraphQLClient:
         _log_parameter: str = "-",
         _log_payload: str = "-",
     ) -> Tuple[Optional[Dict], Optional[str]]:
-        """
-        Execute a GraphQL query with proper formatting.
-        """
+        """Execute a GraphQL query with proper formatting."""
         if not self.endpoint:
             error_msg = "No GraphQL endpoint set"
             self.printer.print_msg(error_msg, status="error")
             return None, error_msg
 
-        payload_body = {"query": query}
+        payload_body: Dict[str, Any] = {"query": query}
         if variables:
             payload_body["variables"] = variables
         if operation_name:
             payload_body["operationName"] = operation_name
 
-        response, error = await self.make_request(
+        return await self.make_request(
             "POST",
             json=payload_body,
             _log_parameter=_log_parameter,
             _log_payload=_log_payload or query[:120],
         )
 
-        if error:
-            return None, error
+    # ------------------------------------------------------------------ #
+    # Schema helpers (shared by introspection + file load)
+    # ------------------------------------------------------------------ #
 
-        return response, None
+    def _extract_fields(self, schema_data: Dict) -> None:
+        """Parse queryType/mutationType fields from a schema dict into lookup maps."""
+        self.schema = schema_data
+        self.query_fields.clear()
+        self.mutation_fields.clear()
+
+        for type_key, target in [
+            ("queryType", self.query_fields),
+            ("mutationType", self.mutation_fields),
+        ]:
+            if schema_data.get(type_key):
+                for field in schema_data[type_key].get("fields", []):
+                    target[field["name"]] = {"args": field.get("args", [])}
 
     # ------------------------------------------------------------------ #
     # Introspection
     # ------------------------------------------------------------------ #
 
     async def introspection_query(self) -> bool:
-        """
-        Run introspection query to validate the GraphQL endpoint and cache schema info.
-        """
+        """Run introspection query to validate the endpoint and cache schema info."""
         query = """
         query {
             __schema {
@@ -292,16 +292,7 @@ class GraphQLClient:
             )
             return False
 
-        self.schema = schema_data
-
-        if schema_data.get("queryType"):
-            for field in schema_data["queryType"].get("fields", []):
-                self.query_fields[field["name"]] = {"args": field.get("args", [])}
-
-        if schema_data.get("mutationType"):
-            for field in schema_data["mutationType"].get("fields", []):
-                self.mutation_fields[field["name"]] = {"args": field.get("args", [])}
-
+        self._extract_fields(schema_data)
         self.printer.print_msg("Introspection successful", status="success")
         return True
 
@@ -313,28 +304,17 @@ class GraphQLClient:
             schema_data: The ``__schema`` portion of an introspection response.
 
         Returns:
-            bool: True if schema was loaded successfully.
+            True if schema was loaded successfully.
         """
         if not schema_data:
             return False
 
-        self.schema = schema_data
-
-        if schema_data.get("queryType"):
-            for field in schema_data["queryType"].get("fields", []):
-                self.query_fields[field["name"]] = {"args": field.get("args", [])}
-
-        if schema_data.get("mutationType"):
-            for field in schema_data["mutationType"].get("fields", []):
-                self.mutation_fields[field["name"]] = {"args": field.get("args", [])}
-
+        self._extract_fields(schema_data)
         self.printer.print_msg("Schema loaded from file", status="success")
         return True
 
     async def setup_endpoint(self, endpoint: str, proxy: Optional[str] = None) -> bool:
-        """
-        Set the endpoint, configure proxy if provided, and run introspection.
-        """
+        """Set the endpoint, configure proxy if provided, and run introspection."""
         self.set_endpoint(endpoint)
 
         if proxy:
