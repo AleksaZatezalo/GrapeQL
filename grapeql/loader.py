@@ -1,10 +1,11 @@
 """
 GrapeQL Test Case Loader
 Author: Aleksa Zatezalo
-Version: 3.0
+Version: 3.1
 Date: February 2025
 Description: Loads test case definitions from a directory of YAML files.
              Each module has its own subdirectory under the test_cases root.
+             v3.1: Added include_files filter for --include CLI flag.
 
 Directory layout expected:
 
@@ -13,7 +14,9 @@ Directory layout expected:
     │   └── engines.yaml
     ├── injection/
     │   ├── sqli.yaml
-    │   └── command.yaml
+    │   ├── command.yaml
+    │   ├── oob.yaml
+    │   └── dvga_oob.yaml
     ├── info/
     │   └── checks.yaml
     └── dos/
@@ -22,7 +25,7 @@ Directory layout expected:
 
 import os
 import glob
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Set
 
 import yaml
 
@@ -36,6 +39,10 @@ class TestCaseLoader:
         sqli_cases  = loader.load_module("injection")    # merges all YAMLs in injection/
         dos_cases   = loader.load_module("dos")
         single_file = loader.load_file("injection/sqli.yaml")
+
+        # Only load specific files across all modules:
+        loader.set_include_files(["dvga_oob.yaml", "sqli.yaml"])
+        filtered = loader.load_module("injection")  # only dvga_oob + sqli
     """
 
     def __init__(self, test_cases_dir: str):
@@ -46,6 +53,33 @@ class TestCaseLoader:
         self.root = os.path.abspath(test_cases_dir)
         if not os.path.isdir(self.root):
             raise FileNotFoundError(f"Test cases directory not found: {self.root}")
+        self._include_files: Optional[Set[str]] = None
+
+    # ------------------------------------------------------------------ #
+    #  Include filter
+    # ------------------------------------------------------------------ #
+
+    def set_include_files(self, filenames: List[str]) -> None:
+        """
+        Restrict which YAML files are loaded by ``load_module()``.
+
+        Args:
+            filenames: List of basenames (e.g. ["dvga_oob.yaml", "sqli.yaml"]).
+                       Extension is optional — ".yaml" is appended if missing.
+        """
+        normalised: Set[str] = set()
+        for name in filenames:
+            # Accept with or without extension
+            if not (name.endswith(".yaml") or name.endswith(".yml")):
+                name = name + ".yaml"
+            normalised.add(name)
+        self._include_files = normalised
+
+    def _matches_filter(self, path: str) -> bool:
+        """Return True if *path* passes the include filter (or no filter is set)."""
+        if self._include_files is None:
+            return True
+        return os.path.basename(path) in self._include_files
 
     # ------------------------------------------------------------------ #
     #  Public API
@@ -59,6 +93,9 @@ class TestCaseLoader:
         containing a list of test case dicts.  Files are merged in sorted
         filename order.
 
+        When an include filter is active (via ``set_include_files``), only
+        files whose basename is in the include set are loaded.
+
         Args:
             module_name: Subdirectory name (e.g. "injection", "dos").
 
@@ -71,9 +108,11 @@ class TestCaseLoader:
 
         merged: List[Dict[str, Any]] = []
         for yaml_path in sorted(glob.glob(os.path.join(module_dir, "*.yaml"))):
-            merged.extend(self._parse_file(yaml_path))
+            if self._matches_filter(yaml_path):
+                merged.extend(self._parse_file(yaml_path))
         for yaml_path in sorted(glob.glob(os.path.join(module_dir, "*.yml"))):
-            merged.extend(self._parse_file(yaml_path))
+            if self._matches_filter(yaml_path):
+                merged.extend(self._parse_file(yaml_path))
         return merged
 
     def load_file(self, relative_path: str) -> List[Dict[str, Any]]:

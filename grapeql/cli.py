@@ -87,6 +87,10 @@ Examples:
   # Use a pre-captured schema (introspection is still probed but not required)
   grapeql --api https://example.com/graphql --schema-file schema.json
 
+  # Only run DVGA OOB payloads
+  grapeql --api http://localhost:5013/graphql \\
+      --modules injection --include dvga_oob
+
   # Combine: specific modules + supplied schema + logging
   grapeql --api https://example.com/graphql \\
       --modules injection --schema-file schema.json --log-file scan.log
@@ -143,6 +147,16 @@ Examples:
             "--test-cases",
             default=_DEFAULT_TEST_CASES_DIR,
             help="Directory containing YAML test case files (default: bundled)",
+        )
+        parser.add_argument(
+            "--include",
+            nargs="+",
+            metavar="FILE",
+            help=(
+                "Only run test cases from these YAML files (basename, e.g. "
+                "'dvga_oob.yaml sqli.yaml').  Extension is optional.  "
+                "Applies across all modules."
+            ),
         )
         parser.add_argument(
             "--schema-file",
@@ -357,6 +371,13 @@ Examples:
             logger = GrapeLogger(log_file=args.log_file)
             loader = TestCaseLoader(args.test_cases)
             baseline = BaselineTracker()
+
+            # Apply --include filter to restrict which YAML files are loaded
+            if args.include:
+                loader.set_include_files(args.include)
+                self.printer.print_msg(
+                    f"Include filter: {', '.join(args.include)}", status="log"
+                )
 
             self.reporter.set_target(args.api)
             self.printer.print_section(f"Testing endpoint: {args.api}")
