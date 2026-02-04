@@ -1,0 +1,200 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+jobs:
+
+  # -------------------------------------------------------------------
+  #  Lint
+  # -------------------------------------------------------------------
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install lint tools
+        run: pip install black flake8 isort
+
+      - name: Check formatting (black)
+        run: black --check --diff .
+
+      - name: Check import order (isort)
+        run: isort --check-only --diff .
+
+      - name: Lint (flake8)
+        run: flake8 grapeql/ tests/ --max-line-length 120 --extend-ignore E203,W503
+
+  # -------------------------------------------------------------------
+  #  Test matrix
+  # -------------------------------------------------------------------
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    needs: lint
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ matrix.python-version }}-
+
+      - name: Install package + test deps
+        run: |
+          pip install --upgrade pip
+          pip install -e ".[dev]" 2>/dev/null || pip install -e .
+          pip install pytest pytest-asyncio pytest-cov httpx
+
+      - name: Run tests
+        run: |
+          pytest tests/ \
+            -v \
+            --tb=short \
+            --cov=grapeql \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml \
+            --junitxml=junit.xml
+
+      - name: Upload coverage artifact
+        if: matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-py${{ matrix.python-version }}
+          path: junit.xml
+
+  # -------------------------------------------------------------------
+  #  YAML validation
+  # -------------------------------------------------------------------
+  yaml-lint:
+    name: Validate YAML test cases
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PyYAML
+        run: pip install pyyaml
+
+      - name: Validate all YAML files
+        run: |
+          python -c "
+          import yaml, sys, glob, os
+
+          errors = 0
+          for pattern in ['grapeql/test_cases/**/*.yaml', 'grapeql/test_cases/**/*.yml']:
+              for path in glob.glob(pattern, recursive=True):
+                  try:
+                      with open(path) as f:
+                          data = yaml.safe_load(f)
+                      if not isinstance(data, dict):
+                          print(f'FAIL {path}: top-level is not a dict')
+                          errors += 1
+                      elif 'test_cases' not in data:
+                          print(f'FAIL {path}: missing test_cases key')
+                          errors += 1
+                      elif not isinstance(data['test_cases'], list):
+                          print(f'FAIL {path}: test_cases is not a list')
+                          errors += 1
+                      else:
+                          print(f'OK   {path} ({len(data[\"test_cases\"])} cases)')
+                  except yaml.YAMLError as e:
+                      print(f'FAIL {path}: {e}')
+                      errors += 1
+
+          if errors:
+              print(f'\n{errors} YAML file(s) failed validation')
+              sys.exit(1)
+          print('\nAll YAML files valid')
+          "
+
+  # -------------------------------------------------------------------
+  #  Import check
+  # -------------------------------------------------------------------
+  import-check:
+    name: Verify package imports
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package
+        run: |
+          pip install --upgrade pip
+          pip install -e .
+          pip install httpx
+
+      - name: Verify all public exports import cleanly
+        run: |
+          python -c "
+          from grapeql import (
+              GrapePrinter, Finding, GrapeLogger, TestCaseLoader,
+              BaselineTracker, GraphQLClient, Fingerprinter,
+              VulnerabilityTester, InjectionTester, DosTester,
+              InfoTester, Reporter,
+          )
+          from grapeql.ai_agent import AIAgent
+          from grapeql.injection_tester import OOBListener, OOBConnection
+          from grapeql.cli import GrapeQL
+          print('All imports OK')
+          "
+
+  # -------------------------------------------------------------------
+  #  Gate — blocks merge if anything above fails
+  # -------------------------------------------------------------------
+  gate:
+    name: PR Gate
+    runs-on: ubuntu-latest
+    needs: [lint, test, yaml-lint, import-check]
+    if: always()
+
+    steps:
+      - name: Check all jobs passed
+        run: |
+          if [[ "${{ needs.lint.result }}" != "success" ]] || \
+             [[ "${{ needs.test.result }}" != "success" ]] || \
+             [[ "${{ needs.yaml-lint.result }}" != "success" ]] || \
+             [[ "${{ needs.import-check.result }}" != "success" ]]; then
+            echo "One or more required jobs failed"
+            exit 1
+          fi
+          echo "All checks passed"
