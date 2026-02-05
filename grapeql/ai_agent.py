@@ -1,11 +1,12 @@
 """
 GrapeQL AI Agent
 Author: Aleksa Zatezalo
-Version: 1.0
+Version: 2.0
 Date: February 2025
 Description: Post-scan AI analysis module. Sends collected findings to the
              Anthropic Messages API and returns a structured executive summary
-             with prioritised next steps for further testing.
+             with prioritised next steps for further testing. Version 2.0 adds
+             GraphQL schema analysis and intelligent payload suggestions.
 """
 
 import json
@@ -21,7 +22,7 @@ from .utils import GrapePrinter, Finding
 
 _API_URL = "https://api.anthropic.com/v1/messages"
 _MODEL = "claude-sonnet-4-20250514"
-_MAX_TOKENS = 4096
+_MAX_TOKENS = 8192
 _API_VERSION = "2023-06-01"
 
 _SYSTEM_PROMPT = """\
@@ -32,39 +33,87 @@ GraphQL vulnerability scanner.
 You will receive:
   1. The target endpoint URL.
   2. A JSON array of findings produced by GrapeQL's scan modules.
-  3. An optional free-form message from the operator.
+  3. The complete GraphQL introspection schema (if available).
+  4. An optional free-form message from the operator.
 
-Your job is to produce a concise, actionable Markdown section that will be \
+Your job is to produce a comprehensive, actionable Markdown section that will be \
 appended directly to the report.  Use the following structure exactly:
 
 ## AI Analysis
 
 ### Executive Summary
 Two to four sentences that characterise the overall security posture of the \
-target based on the findings.  Mention the most critical issues first.
+target based on the findings and schema analysis. Mention the most critical \
+issues first.
+
+### Schema Analysis
+Analyze the provided GraphQL schema for potential security concerns:
+- Identify sensitive fields that may leak information (passwords, tokens, internal IDs, etc.)
+- Note dangerous mutations (delete, update, create operations on sensitive resources)
+- Highlight complex nested types that could enable deep query attacks
+- Point out custom scalar types that might accept injection payloads
+- Flag fields with security-relevant names (admin, debug, internal, system, etc.)
+- Identify missing authentication/authorization indicators
+- Note any unusual or suspicious field patterns
+
+If no schema is provided, state "Schema not available for analysis" and skip this section.
 
 ### Risk Analysis
 For each CRITICAL or HIGH finding, write one short paragraph explaining the \
-real-world impact and how an attacker could chain it with other findings.  \
-If there are no CRITICAL/HIGH findings, note that the attack surface appears \
-limited and summarise MEDIUM/LOW risks instead.
+real-world impact and how an attacker could chain it with other findings or \
+schema elements. If there are no CRITICAL/HIGH findings, note that the attack \
+surface appears limited and summarise MEDIUM/LOW risks instead.
 
 ### Recommended Next Steps
 A numbered list of concrete manual testing actions the operator should take \
-next.  Prioritise by severity and exploitability.  Include specific GraphQL \
-queries, mutations, or tool commands where possible.
+next. Prioritise by severity and exploitability. Include specific GraphQL \
+queries, mutations, or tool commands where possible. Reference specific schema \
+fields discovered in the analysis.
+
+### Suggested Additional Payloads
+Based on the schema and existing test results, suggest 3-8 new test payloads \
+that would be valuable to try. Format these as valid YAML test cases that can \
+be directly added to GrapeQL's test_cases directory. Include:
+- SQL injection variants tailored to discovered field types
+- Command injection payloads for string fields in mutations
+- Authentication bypass attempts for protected mutations
+- IDOR tests for ID-type arguments
+- Any schema-specific payloads based on field names or types
+
+Use this YAML structure:
+```yaml
+test_cases:
+  - name: descriptive_name
+    payload: "the payload string"
+    indicators:
+      - "expected error pattern"
+      - "another pattern"
+```
+
+Or for auth bypasses:
+```yaml
+test_cases:
+  - name: descriptive_name
+    strategy: header_bypass
+    headers:
+      Authorization: "Bearer malicious_value"
+    description: "What this tests"
+```
 
 ### Gaps in Coverage
 Briefly note any common GraphQL attack classes that the automated scan may \
 have missed (e.g. business-logic flaws, access-control between roles, \
-subscription abuse, batching attacks) and suggest how to test for them.
+subscription abuse, batching attacks, field-level authorization) and suggest \
+how to test for them.
 
 Rules:
 - Write in third person ("the target", "the API").
-- Be specific — reference finding titles and endpoints from the data.
+- Be specific — reference finding titles, endpoints, and schema fields from the data.
 - Do NOT repeat the raw finding descriptions verbatim; synthesise them.
-- Keep the entire section under 800 words.
+- For schema analysis, focus on actionable security insights, not just listing fields.
+- Keep the entire section under 1500 words.
 - Output raw Markdown only — no code fences around the whole response.
+- The Suggested Additional Payloads section should contain only valid, copy-pasteable YAML.
 """
 
 
@@ -75,13 +124,18 @@ Rules:
 
 class AIAgent:
     """
-    Post-scan analysis module.
+    Post-scan analysis module with enhanced schema analysis.
+
+    Version 2.0 adds GraphQL schema analysis, identifying sensitive fields,
+    dangerous mutations, and suggesting additional test payloads based on
+    the discovered schema structure.
 
     Usage:
         agent = AIAgent(api_key="sk-ant-...")
         summary_md = await agent.analyse(
             target="http://localhost:5013/graphql",
             findings=[...],
+            schema=client.schema,
             message="Focus on SSRF chains.",
         )
         # summary_md is a Markdown string ready to append to the report.
@@ -99,6 +153,7 @@ class AIAgent:
         self,
         target: str,
         findings: List[Finding],
+        schema: Optional[Dict] = None,
         message: Optional[str] = None,
     ) -> str:
         """Assemble the user-turn content sent to the model."""
@@ -110,6 +165,14 @@ class AIAgent:
             f"**Target:** `{target}`\n",
             f"**Findings ({len(findings)} total):**\n```json\n{findings_json}\n```",
         ]
+
+        if schema:
+            schema_json = json.dumps(schema, indent=2)
+            parts.append(
+                f"\n**GraphQL Schema:**\n```json\n{schema_json}\n```"
+            )
+        else:
+            parts.append("\n**GraphQL Schema:** Not available")
 
         if message:
             parts.append(f"\n**Operator message:** {message}")
@@ -124,13 +187,21 @@ class AIAgent:
         self,
         target: str,
         findings: List[Finding],
+        schema: Optional[Dict] = None,
         message: Optional[str] = None,
     ) -> Optional[str]:
         """
-        Send findings to the Anthropic Messages API and return the AI
-        analysis as a Markdown string.
+        Send findings and schema to the Anthropic Messages API and return
+        the AI analysis as a Markdown string.
 
-        Returns ``None`` on failure (error is printed to console).
+        Args:
+            target: The GraphQL endpoint URL
+            findings: List of Finding objects from scan modules
+            schema: Optional GraphQL introspection schema dictionary
+            message: Optional operator message to guide analysis
+
+        Returns:
+            Markdown string with AI analysis, or None on failure.
         """
         if not findings:
             self.printer.print_msg(
@@ -138,9 +209,9 @@ class AIAgent:
             )
             return None
 
-        self.printer.print_msg("Generating AI analysis...", status="log")
+        self.printer.print_msg("Generating enhanced AI analysis with schema review...", status="log")
 
-        user_content = self._build_user_prompt(target, findings, message)
+        user_content = self._build_user_prompt(target, findings, schema, message)
 
         payload = {
             "model": _MODEL,
