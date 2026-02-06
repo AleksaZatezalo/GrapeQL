@@ -417,6 +417,7 @@ Examples:
                 ai_summary = await agent.analyse(
                     target=args.api,
                     findings=self.reporter.findings,
+                    schema=primary_client.schema,
                     message=args.ai_message,
                 )
                 if ai_summary:
