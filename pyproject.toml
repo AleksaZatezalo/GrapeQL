@@ -1,19 +1,39 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[tool.black]
-line-length = 88
-target-version = ['py37', 'py38', 'py39', 'py310']
-include = '\.pyi?$'
+[project]
+name = "grapeql"
+version = "3.4.0"
+description = "GraphQL Security Testing Tool"
+readme = "README.md"
+license = "MIT"
+authors = [
+    { name = "Aleksa Zatezalo", email = "your@email.com" },
+]
+requires-python = ">=3.9"
+keywords = ["graphql", "security", "pentesting", "vulnerability-scanner"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+]
+dependencies = [
+    "aiohttp>=3.8",
+    "pyyaml>=6.0",
+    "httpx>=0.24",
+]
 
-[tool.isort]
-profile = "black"
-multi_line_output = 3
+[project.urls]
+Homepage = "https://github.com/AleksaZatezalo/grapeql"
+Repository = "https://github.com/AleksaZatezalo/grapeql"
+Issues = "https://github.com/AleksaZatezalo/grapeql/issues"
 
-[tool.mypy]
-python_version = "3.7"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
+[project.scripts]
+grapeql = "grapeql.cli:run_cli"
