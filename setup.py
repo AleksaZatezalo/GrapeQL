@@ -37,4 +37,8 @@ setup(
             "grapeql=grapeql.cli:run_cli",
         ],
     },
+
+    package_data={
+    "grapeql": ["test_cases/**/*", "test_cases/*"],
+    }
 )

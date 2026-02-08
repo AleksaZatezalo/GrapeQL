@@ -59,7 +59,7 @@ class GrapePrinter:
             status: "success", "warning", "error"/"failed", or "log" (default)
         """
         if status == "success":
-            print(self.GREEN + "\n[+] " + message + self.END)
+            print(self.GREEN + "[+] " + message + self.END)
         elif status == "warning":
             print(self.YELLOW + "[!] " + message + self.END)
         elif status in ("error", "failed"):
@@ -78,7 +78,7 @@ class GrapePrinter:
         time.sleep(0.5)
         self.print_msg("Errors are printed like this.", status="error")
         time.sleep(0.5)
-        self.print_msg("Logs are printed like this.", status="log")
+        self.print_msg("Logs are printed like this.\n\n", status="log")
         time.sleep(0.5)
 
     def intro(self):
@@ -95,13 +95,13 @@ class GrapePrinter:
         color = self.RED if severity in ("HIGH", "CRITICAL") else (
             self.YELLOW if severity == "MEDIUM" else self.BLUE
         )
-        print(f"\n{color}{self.BOLD}[{severity}] {title}{self.END}")
+        print(f"{color}{self.BOLD}[{severity}] {title}{self.END}")
         if details:
             print(f"  {details}")
 
     def print_section(self, title: str):
         """Print a section header."""
-        print(f"\n{self.BOLD}{self.PURPLE}=== {title} ==={self.END}\n")
+        print(self.CYAN + "[!] " + title + self.END)
 
 
 @dataclass
