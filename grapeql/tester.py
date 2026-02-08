@@ -63,27 +63,31 @@ class VulnerabilityTester:
         repeated for every module.
         """
         if pre_configured_client:
-            self.client.endpoint = pre_configured_client.endpoint
-            self.client.proxy_url = pre_configured_client.proxy_url
-            self.client.headers = pre_configured_client.headers.copy()
-            self.client.cookies = pre_configured_client.cookies.copy()
-            self.client.auth_token = pre_configured_client.auth_token
-            self.client.schema = pre_configured_client.schema
-            self.client.query_fields = (
-                pre_configured_client.query_fields.copy()
-                if pre_configured_client.query_fields
-                else {}
-            )
-            self.client.mutation_fields = (
-                pre_configured_client.mutation_fields.copy()
-                if pre_configured_client.mutation_fields
-                else {}
-            )
-
+            self._copy_client_state(pre_configured_client)
             if pre_configured_client.schema:
                 return True
 
         return await self.client.setup_endpoint(endpoint, proxy)
+
+    def _copy_client_state(self, src: GraphQLClient) -> None:
+        """Copy lightweight client state from an already-configured client.
+
+        This keeps per-module clients independent and avoids re-running
+        introspection in each module when a primary client has already
+        been prepared by the CLI.
+        """
+        self.client.endpoint = src.endpoint
+        self.client.proxy_url = src.proxy_url
+        self.client.headers = src.headers.copy() if getattr(src, "headers", None) else {}
+        self.client.cookies = src.cookies.copy() if getattr(src, "cookies", None) else {}
+        self.client.auth_token = getattr(src, "auth_token", None)
+        self.client.schema = getattr(src, "schema", None)
+        self.client.query_fields = (
+            src.query_fields.copy() if getattr(src, "query_fields", None) else {}
+        )
+        self.client.mutation_fields = (
+            src.mutation_fields.copy() if getattr(src, "mutation_fields", None) else {}
+        )
 
     def add_finding(self, finding: Finding) -> None:
         """Add a finding to the results."""

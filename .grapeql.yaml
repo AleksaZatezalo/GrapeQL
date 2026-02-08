@@ -1,0 +1,15 @@
+# Example GrapeQL Configuration File
+# Place this in your project root as .grapeql.yaml
+# CLI arguments will override these defaults
+
+api: https://countries.trevorblades.com/
+modules:
+  - fingerprint
+  - info
+  - injection
+  - auth
+auth-type: Bearer
+log-file: grapeql_scan.log
+report: grapeql_report.md
+report-format: markdown
+test-cases: ./grapeql/test_cases
