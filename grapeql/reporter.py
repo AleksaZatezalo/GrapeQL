@@ -10,6 +10,7 @@ Description: Report generation for GrapeQL findings.
 import os
 import json
 import time
+import threading
 from typing import Dict, List, Optional
 from .utils import GrapePrinter, Finding
 
@@ -26,6 +27,7 @@ class Reporter:
         self.target = "unknown"
         self.scan_time = time.strftime("%Y-%m-%d_%H-%M-%S")
         self._ai_summary: Optional[str] = None
+        self._lock = threading.Lock()
 
     def set_target(self, target: str) -> None:
         self.target = target
@@ -42,11 +44,13 @@ class Reporter:
         self._add_finding_deduplicated(finding)
 
     def _add_finding_deduplicated(self, finding: Finding) -> None:
-        if not any(
-            f.title == finding.title and f.endpoint == finding.endpoint
-            for f in self.findings
-        ):
-            self.findings.append(finding)
+        # Guard against concurrent additions when tests run in parallel
+        with self._lock:
+            if not any(
+                f.title == finding.title and f.endpoint == finding.endpoint
+                for f in self.findings
+            ):
+                self.findings.append(finding)
 
     # ------------------------------------------------------------------ #
     #  Shared helpers

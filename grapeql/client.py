@@ -1,15 +1,18 @@
 """
 GrapeQL HTTP Client
 Author: Aleksa Zatezalo
-Version: 3.1
+Version: 3.2
 Date: February 2025
-Description: Core HTTP client for GrapeQL with consistent request handling and structured logging.
+Description: Core HTTP client for GrapeQL with consistent request handling, structured logging,
+             response caching, and batch query support.
+             v3.2: Added batch query support and response caching for improved performance.
 """
 
 import aiohttp
 import asyncio
 import json
 import time
+import hashlib
 from typing import Dict, List, Optional, Any, Tuple
 from .utils import GrapePrinter
 from .logger import GrapeLogger
@@ -22,9 +25,10 @@ class GraphQLClient:
     structured logging of every request/response pair.
     """
 
-    def __init__(self, logger: Optional[GrapeLogger] = None):
+    def __init__(self, logger: Optional[GrapeLogger] = None, session: Optional[aiohttp.ClientSession] = None):
         self.printer = GrapePrinter()
         self.logger = logger
+        self.session = session  # Optional shared session for connection pooling
         self.endpoint: Optional[str] = None
         self.proxy_url: Optional[str] = None
         self.headers: Dict[str, str] = {"Content-Type": "application/json"}
@@ -38,14 +42,48 @@ class GraphQLClient:
 
         self._log_module: str = "GraphQLClient"
         self._log_test: str = "-"
+        
+        # Response cache: key is hash of (query, variables); value is response
+        self._response_cache: Dict[str, Any] = {}
+        self._cache_hits: int = 0
+        self._cache_misses: int = 0
 
     def set_log_context(self, module: str, test: str = "-") -> None:
         self._log_module = module
         self._log_test = test
 
     # ------------------------------------------------------------------ #
-    # Configuration helpers
+    # Cache management
     # ------------------------------------------------------------------ #
+
+    def _cache_key(self, query: str, variables: Optional[Dict] = None) -> str:
+        """Generate a cache key from query and variables."""
+        key_str = f"{query}:{json.dumps(variables or {}, sort_keys=True)}"
+        return hashlib.md5(key_str.encode()).hexdigest()
+
+    def _get_cached(self, query: str, variables: Optional[Dict] = None) -> Optional[Any]:
+        """Retrieve a cached response if available."""
+        key = self._cache_key(query, variables)
+        if key in self._response_cache:
+            self._cache_hits += 1
+            return self._response_cache[key]
+        self._cache_misses += 1
+        return None
+
+    def _cache_response(self, query: str, variables: Optional[Dict], response: Any) -> None:
+        """Store a response in the cache."""
+        key = self._cache_key(query, variables)
+        self._response_cache[key] = response
+
+    def clear_cache(self) -> None:
+        """Clear the response cache."""
+        self._response_cache.clear()
+        self._cache_hits = 0
+        self._cache_misses = 0
+
+    def cache_stats(self) -> Dict[str, int]:
+        """Return cache hit/miss statistics."""
+        return {"hits": self._cache_hits, "misses": self._cache_misses}
 
     def configure_proxy(self, proxy_host: str, proxy_port: int) -> None:
         self.proxy_url = f"http://{proxy_host}:{proxy_port}"
@@ -109,8 +147,15 @@ class GraphQLClient:
 
         start = time.time()
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.request(
+            # Use shared session if available, otherwise create a temporary one
+            session_to_use = self.session
+            should_close = False
+            if session_to_use is None:
+                session_to_use = aiohttp.ClientSession()
+                should_close = True
+
+            try:
+                async with session_to_use.request(
                     method, target_url, **request_kwargs
                 ) as response:
                     self.last_response = response
@@ -138,6 +183,9 @@ class GraphQLClient:
                         )
 
                     return result, None
+            finally:
+                if should_close:
+                    await session_to_use.close()
 
         except asyncio.TimeoutError:
             duration = time.time() - start
@@ -175,12 +223,19 @@ class GraphQLClient:
         *,
         _log_parameter: str = "-",
         _log_payload: str = "-",
+        use_cache: bool = True,
     ) -> Tuple[Optional[Dict], Optional[str]]:
-        """Execute a GraphQL query with proper formatting."""
+        """Execute a GraphQL query with caching support."""
         if not self.endpoint:
             error_msg = "No GraphQL endpoint set"
             self.printer.print_msg(error_msg, status="error")
             return None, error_msg
+
+        # Check cache first
+        if use_cache:
+            cached = self._get_cached(query, variables)
+            if cached:
+                return cached, None
 
         payload_body: Dict[str, Any] = {"query": query}
         if variables:
@@ -188,12 +243,126 @@ class GraphQLClient:
         if operation_name:
             payload_body["operationName"] = operation_name
 
-        return await self.make_request(
+        result, error = await self.make_request(
             "POST",
             json=payload_body,
             _log_parameter=_log_parameter,
             _log_payload=_log_payload or query[:120],
         )
+
+        if error is None and result is not None and use_cache:
+            self._cache_response(query, variables, result)
+
+        return result, error
+
+    async def graphql_batch(
+        self,
+        queries: List[Tuple[str, Optional[Dict], Optional[str]]],
+        *,
+        _log_parameter: str = "-",
+    ) -> Tuple[Optional[List[Dict]], Optional[str]]:
+        """
+        Execute multiple GraphQL queries in a single batch request.
+        
+        Args:
+            queries: List of (query, variables, operation_name) tuples
+            _log_parameter: Parameter name for logging
+        
+        Returns:
+            Tuple of (list of results, error message)
+        """
+        if not self.endpoint:
+            error_msg = "No GraphQL endpoint set"
+            self.printer.print_msg(error_msg, status="error")
+            return None, error_msg
+
+        # Build batch payload
+        batch_payload = []
+        for query, variables, op_name in queries:
+            item: Dict[str, Any] = {"query": query}
+            if variables:
+                item["variables"] = variables
+            if op_name:
+                item["operationName"] = op_name
+            batch_payload.append(item)
+
+        start = time.time()
+        try:
+            session_to_use = self.session
+            should_close = False
+            if session_to_use is None:
+                session_to_use = aiohttp.ClientSession()
+                should_close = True
+
+            try:
+                request_kwargs = {
+                    "headers": self.headers,
+                    "cookies": self.cookies,
+                    "proxy": self.proxy_url,
+                    "ssl": False,
+                    "timeout": self.timeout,
+                    "json": batch_payload,
+                }
+
+                async with session_to_use.request(
+                    "POST", self.endpoint, **request_kwargs
+                ) as response:
+                    self.last_response = response
+                    duration = time.time() - start
+
+                    if response.content_type == "application/json":
+                        result = await response.json()
+                    else:
+                        text = await response.text()
+                        try:
+                            result = json.loads(text)
+                        except json.JSONDecodeError:
+                            result = {"text": text}
+
+                    if self.logger:
+                        self.logger.log_request(
+                            module=self._log_module,
+                            test=self._log_test,
+                            parameter=_log_parameter,
+                            payload=f"batch[{len(queries)}]",
+                            verb="POST",
+                            status="success",
+                            response=f"batch response ({len(queries)} queries)",
+                            duration=duration,
+                        )
+
+                    return result, None
+            finally:
+                if should_close:
+                    await session_to_use.close()
+
+        except asyncio.TimeoutError:
+            duration = time.time() - start
+            error_msg = f"Batch request to {self.endpoint} timed out"
+            self.printer.print_msg(error_msg, status="error")
+            if self.logger:
+                self.logger.log_timeout(
+                    module=self._log_module,
+                    test=self._log_test,
+                    parameter=_log_parameter,
+                    payload=f"batch[{len(queries)}]",
+                    verb="POST",
+                    duration=duration,
+                )
+            return None, error_msg
+
+        except Exception as e:
+            duration = time.time() - start
+            error_msg = f"Error making batch request to {self.endpoint}: {str(e)}"
+            self.printer.print_msg(error_msg, status="error")
+            if self.logger:
+                self.logger.log_error(
+                    module=self._log_module,
+                    test=self._log_test,
+                    parameter=_log_parameter,
+                    message=error_msg,
+                )
+            return None, error_msg
 
     # ------------------------------------------------------------------ #
     # Schema helpers (shared by introspection + file load)

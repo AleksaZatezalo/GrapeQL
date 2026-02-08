@@ -107,12 +107,11 @@ class TestCaseLoader:
             return []
 
         merged: List[Dict[str, Any]] = []
-        for yaml_path in sorted(glob.glob(os.path.join(module_dir, "*.yaml"))):
-            if self._matches_filter(yaml_path):
-                merged.extend(self._parse_file(yaml_path))
-        for yaml_path in sorted(glob.glob(os.path.join(module_dir, "*.yml"))):
-            if self._matches_filter(yaml_path):
-                merged.extend(self._parse_file(yaml_path))
+        # Support both .yaml and .yml extensions in a single loop
+        for pattern in ("*.yaml", "*.yml"):
+            for yaml_path in sorted(glob.glob(os.path.join(module_dir, pattern))):
+                if self._matches_filter(yaml_path):
+                    merged.extend(self._parse_file(yaml_path))
         return merged
 
     def load_file(self, relative_path: str) -> List[Dict[str, Any]]:
