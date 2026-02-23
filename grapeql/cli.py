@@ -14,7 +14,6 @@ import json
 import os
 import sys
 from typing import List, Set
-import aiohttp
 
 from .utils import GrapePrinter
 from .ai_agent import AIAgent
@@ -28,7 +27,6 @@ from .reporter import Reporter
 from .logger import GrapeLogger
 from .loader import TestCaseLoader
 from .baseline import BaselineTracker
-from .config import ConfigLoader
 
 
 _DEFAULT_TEST_CASES_DIR = os.path.join(os.path.dirname(__file__), "test_cases")
@@ -202,13 +200,6 @@ Examples:
                 "its analysis (e.g. 'Focus on SSRF chains' or 'Ignore info findings')."
             ),
         )
-        parser.add_argument(
-            "--config",
-            help=(
-                "Path to .grapeql.yaml configuration file. If omitted, searches "
-                "for .grapeql.yaml in current directory and home directory."
-            ),
-        )
 
         return parser.parse_args()
 
@@ -322,8 +313,8 @@ Examples:
     #  Generic module runner
     # ------------------------------------------------------------------ #
 
-    async def _run_module(self, module_name, client, args, logger, loader, baseline, shared_session=None):
-        """Instantiate and run any test module by name, optionally with a shared HTTP session."""
+    async def _run_module(self, module_name, client, args, logger, loader, baseline):
+        """Instantiate and run any test module by name."""
         cls = MODULE_CLASSES[module_name]
         self.printer.print_section(module_name.replace("_", " ").title() + " Testing")
 
@@ -334,9 +325,6 @@ Examples:
             )
 
         instance = cls(logger=logger, loader=loader, baseline=baseline)
-        # Inject the shared session into the instance's client if provided
-        if shared_session:
-            instance.client.session = shared_session
 
         if not await instance.setup_endpoint(args.api, args.proxy, client):
             return
@@ -369,12 +357,6 @@ Examples:
     async def main(self) -> int:
         try:
             args = self.parse_arguments()
-            
-            # Load configuration file and merge with CLI args
-            config_loader = ConfigLoader()
-            config = config_loader.load_config(args.config)
-            args = config_loader.merge_with_args(config, args)
-            
             self.printer.intro()
 
             # Validate listener args come as a pair
@@ -414,49 +396,9 @@ Examples:
                 f"Modules: {', '.join(modules)}", status="log"
             )
 
-            # Run non-DoS modules concurrently in a single event loop with
-            # a shared aiohttp.ClientSession for connection pooling.
-            parallel_modules = [m for m in modules if m != "dos"]
-            dos_modules = [m for m in modules if m == "dos"]
-
-            if parallel_modules:
-                # Create a shared session for connection pooling
-                async with aiohttp.ClientSession() as shared_session:
-                    # Update the primary client to use the shared session
-                    primary_client.session = shared_session
-
-                    # Run all parallel modules concurrently
-                    tasks = [
-                        self._run_module(
-                            module_name,
-                            primary_client,
-                            args,
-                            logger,
-                            loader,
-                            baseline,
-                            shared_session,
-                        )
-                        for module_name in parallel_modules
-                    ]
-                    try:
-                        await asyncio.gather(*tasks)
-                    except Exception as e:
-                        self.printer.print_msg(
-                            f"Error during concurrent module execution: {str(e)}",
-                            status="error",
-                        )
-
-            # Run DoS modules sequentially (they may be destructive and
-            # rely on the baseline computed above).
-            for module_name in dos_modules:
+            for module_name in modules:
                 await self._run_module(
-                    module_name,
-                    primary_client,
-                    args,
-                    logger,
-                    loader,
-                    baseline,
-                    None,
+                    module_name, primary_client, args, logger, loader, baseline
                 )
 
             # -- Baseline summary --
@@ -466,20 +408,6 @@ Examples:
                 self.printer.print_msg(
                     f"Baseline: {agg['count']} samples, "
                     f"avg={agg['mean']:.3f}s, stddev={agg['stddev']:.3f}s",
-                    status="log",
-                )
-
-            # -- Cache statistics --
-            cache_stats = primary_client.cache_stats()
-            if cache_stats["hits"] > 0 or cache_stats["misses"] > 0:
-                hit_rate = (
-                    100 * cache_stats["hits"] / (cache_stats["hits"] + cache_stats["misses"])
-                    if (cache_stats["hits"] + cache_stats["misses"]) > 0
-                    else 0
-                )
-                self.printer.print_msg(
-                    f"Response cache: {cache_stats['hits']} hits, "
-                    f"{cache_stats['misses']} misses ({hit_rate:.1f}% hit rate)",
                     status="log",
                 )
 
