@@ -114,6 +114,10 @@ class Finding:
     endpoint: str
     impact: Optional[str] = None
     remediation: Optional[str] = None
+    # The concrete request that triggered this finding, when known:
+    #   {"query": <graphql string>, "variables": <dict|None>, "payload": <str>}
+    # Forwarded to the exploit agent so it can build a PoC from the real request.
+    evidence: Optional[Dict] = None
     timestamp: str = field(default_factory=lambda: time.strftime("%Y-%m-%d %H:%M:%S"))
 
     def __post_init__(self):
@@ -128,6 +132,7 @@ class Finding:
             "endpoint": self.endpoint,
             "impact": self.impact,
             "remediation": self.remediation,
+            "evidence": self.evidence,
             "timestamp": self.timestamp,
         }
 

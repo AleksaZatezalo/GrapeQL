@@ -60,6 +60,103 @@ pip install -e .
 
 ---
 
+## Web UI (Docker)
+
+GrapeQL ships with a containerized React web interface for running scans,
+editing or uploading YAML test cases, configuring the AI model, and viewing
+findings (including optional AI-assisted analysis) in the browser.
+
+AI features (post-scan analysis and the per-finding exploit agent) run entirely
+locally against a **Qwen** model served over an OpenAI-compatible API — by
+default a local [Ollama](https://ollama.com) server. **No API keys are
+required.** Pull a model first:
+
+```bash
+ollama pull qwen2.5-coder:7b
+```
+
+### Run with Docker Compose (recommended)
+
+```bash
+# From the repository root — build and start the app
+docker compose up --build
+
+# Then open:
+#   http://localhost:8000
+```
+
+The container uses **host networking**, so:
+
+- You can scan targets by `localhost`, `127.0.0.1`, or any host IP directly —
+  e.g. `http://127.0.0.1:5013/graphql` for a local DVGA instance.
+- The app reaches your local Ollama on `127.0.0.1:11434` with no extra setup.
+
+Override the model or endpoint via environment variables if needed:
+
+```bash
+QWEN_MODEL=qwen2.5-coder:7b QWEN_BASE_URL=http://localhost:11434/v1 \
+  docker compose up --build
+```
+
+Editable and uploaded test cases are persisted in the `grapeql-testcases`
+Docker volume, so they survive container restarts.
+
+### Run with plain Docker
+
+```bash
+docker build -t grapeql-ui:latest .
+docker run --rm --network host \
+  -v grapeql-testcases:/data/test_cases \
+  grapeql-ui:latest
+# open http://localhost:8000
+```
+
+### Using the interface
+
+- **Scan tab** — Enter the target GraphQL endpoint (e.g.
+  `http://127.0.0.1:5013/graphql`), choose which modules to run, optionally add
+  an authorization token and a schema JSON (used when introspection is
+  disabled), and tick **AI analysis** to have Qwen summarise the findings.
+  Click **Run scan** to see findings grouped by severity.
+- **Generate exploit (per finding)** — Each finding shows a **🧪 Generate
+  exploit** button. It runs an agentic loop: the agent crafts a GraphQL payload
+  carrying a harmless test command (`whoami`), fires it at the live endpoint,
+  inspects the response for proof, and retries up to an iteration cap. A spinner
+  shows while it works. Once done it produces a self-contained `exploit.py` you
+  can review inline and **⬇ Download**. The live requests are always sent to the
+  scanned target only — the agent supplies the query, never the destination.
+  Payloads are non-destructive proofs of exploitability, for authorized testing
+  only.
+- **Test Cases tab** — Browse the bundled YAML test cases by module, edit them
+  in place, create new files, upload your own `.yaml` files, or delete them.
+  Every save is validated to ensure it has a proper `test_cases:` structure.
+- **Ollama tab** — Set the Qwen base URL and model at runtime, test the
+  connection (lists the models available on your Ollama server), or reset to the
+  environment defaults.
+- **Docs tab** — In-app reference for how test cases are structured per module.
+
+> ⚠️ GrapeQL is an active security testing tool. Only scan endpoints you are
+> authorized to test. The DoS module can render a target unresponsive.
+
+### Local development (without Docker)
+
+Run the API and the Vite dev server separately:
+
+```bash
+# Terminal 1 — backend API on :8000
+pip install -e .
+pip install -r webapi/requirements.txt
+uvicorn webapi.server:app --reload --port 8000
+
+# Terminal 2 — frontend dev server on :5173 (proxies /api to :8000)
+cd frontend
+npm install
+npm run dev
+# open http://localhost:5173
+```
+
+---
+
 ## Quick Start
 
 Run a baseline security scan against a GraphQL endpoint:
@@ -74,10 +171,10 @@ Run a comprehensive scan including advanced modules:
 grapeql --api https://example.com/graphql --modules fingerprint info injection auth dos
 ```
 
-Generate a Markdown report:
+Run a scan with local AI-assisted analysis (requires Ollama + a pulled model):
 
 ```bash
-grapeql --api https://example.com/graphql --report report.md
+grapeql --api https://example.com/graphql --ai
 ```
 
 ---
@@ -100,11 +197,14 @@ grapeql --api https://example.com/graphql --schema-file schema.json
 # Scan through a proxy
 grapeql --api https://example.com/graphql --proxy 127.0.0.1:8080 --auth <token>
 
-# JSON report with credentials and logging
+# Scan with credentials and structured logging
 grapeql --api https://example.com/graphql \
-    --report results.json --report-format json \
     --username testuser --password testpass \
     --log-file scan.log
+
+# AI-assisted analysis with a specific local model
+grapeql --api https://example.com/graphql \
+    --ai --ai-model qwen2.5-coder:7b
 ```
 
 ---
@@ -120,14 +220,13 @@ grapeql --api https://example.com/graphql \
 | `--auth-type` | Token prefix (default: `Bearer`) |
 | `--cookie` | Cookie to include |
 | `--schema-file` | JSON introspection schema file |
-| `--report` | Output file for the report |
-| `--report-format` | `markdown` or `json` |
 | `--log-file` | Structured log output |
 | `--include` | Restrict YAML test cases |
 | `--listener-ip` | Enable OOB injection testing |
 | `--listener-port` | Listener port |
-| `--ai-key` | API key for AI-assisted analysis |
-| `--ai-message` | Guidance passed to the AI agent |
+| `--ai` | Enable AI-assisted analysis (local Qwen via Ollama) |
+| `--ai-url` | OpenAI-compatible base URL (default `http://localhost:11434/v1`) |
+| `--ai-model` | Qwen model/tag (default `qwen2.5-coder:7b`) |
 
 ---
 

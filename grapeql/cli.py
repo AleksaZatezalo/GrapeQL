@@ -5,7 +5,8 @@ Version: 3.4
 Date: February 2025
 Description: CLI for GrapeQL GraphQL Security Testing Tool.
              v3.3: Added --listener-ip / --listener-port for OOB testing.
-             v3.4: Added --ai-key / --ai-message for AI-assisted analysis.
+             v3.4: Added --ai for AI-assisted analysis.
+             v3.5: AI analysis now uses a local Qwen model (OpenAI-compatible).
 """
 
 import asyncio
@@ -95,14 +96,12 @@ Examples:
   grapeql --api https://example.com/graphql \\
       --modules injection --schema-file schema.json --log-file scan.log
 
-  # Full scan with AI-assisted analysis
-  grapeql --api https://example.com/graphql \\
-      --report report.md --ai-key sk-ant-...
+  # Full scan with AI-assisted analysis (local Qwen via Ollama)
+  grapeql --api https://example.com/graphql --ai
 
-  # AI analysis with operator guidance
+  # AI analysis with a specific model
   grapeql --api https://example.com/graphql \\
-      --report report.md --ai-key sk-ant-... \\
-      --ai-message "Focus on SSRF and auth bypass chains"
+      --ai --ai-model qwen2.5-coder:7b
             """,
         )
 
@@ -129,13 +128,6 @@ Examples:
             action="append",
             default=[],
             help="Cookie in 'name:value' format (repeatable)",
-        )
-        parser.add_argument("--report", help="Report output file path")
-        parser.add_argument(
-            "--report-format",
-            default="markdown",
-            choices=["markdown", "json"],
-            help="Report format (default: markdown)",
         )
         parser.add_argument("--username", help="Username for injection testing")
         parser.add_argument("--password", help="Password for injection testing")
@@ -186,18 +178,26 @@ Examples:
 
         # ── AI analysis ─────────────────────────────────────────────
         parser.add_argument(
-            "--ai-key",
+            "--ai",
+            action="store_true",
             help=(
-                "Anthropic API key for AI-assisted analysis.  When provided, "
-                "findings are sent to Claude for an executive summary and "
-                "recommended next steps appended to the report."
+                "Enable AI-assisted analysis. Findings are sent to a local Qwen "
+                "model (OpenAI-compatible, default: Ollama) for an executive "
+                "summary and recommended next steps appended to the report."
             ),
         )
         parser.add_argument(
-            "--ai-message",
+            "--ai-url",
             help=(
-                "Optional free-form message passed to the AI agent to guide "
-                "its analysis (e.g. 'Focus on SSRF chains' or 'Ignore info findings')."
+                "OpenAI-compatible base URL for the Qwen model "
+                "(default: env QWEN_BASE_URL or http://localhost:11434/v1)."
+            ),
+        )
+        parser.add_argument(
+            "--ai-model",
+            help=(
+                "Qwen model name/tag to use "
+                "(default: env QWEN_MODEL or qwen2.5-coder:7b)."
             ),
         )
 
@@ -412,24 +412,18 @@ Examples:
                 )
 
             # -- AI analysis (optional) --
-            if args.ai_key:
-                agent = AIAgent(api_key=args.ai_key)
+            if args.ai:
+                agent = AIAgent(base_url=args.ai_url, model=args.ai_model)
                 ai_summary = await agent.analyse(
                     target=args.api,
                     findings=self.reporter.findings,
                     schema=primary_client.schema,
-                    message=args.ai_message,
                 )
                 if ai_summary:
                     self.reporter.set_ai_summary(ai_summary)
 
-            # -- Report --
-            if args.report:
-                self.reporter.generate_report(
-                    output_format=args.report_format, output_file=args.report
-                )
-            else:
-                self.reporter.print_summary()
+            # -- Findings summary --
+            self.reporter.print_summary()
 
             return 0
 

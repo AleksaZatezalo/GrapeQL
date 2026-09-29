@@ -1,68 +1,55 @@
-# Reporter
+# Findings Collector
 
 ## Purpose
-The Reporter module consolidates findings generated across all testing modules and produces structured security reports. Its objective is to transform raw scan data into clear, actionable intelligence that supports remediation, audit workflows, and security decision-making.
+The Reporter module consolidates findings generated across all testing modules
+into a single, deduplicated set and prints a console summary. Its objective is
+to turn raw scan data into clear, actionable intelligence. As of v3.0, file-based
+report generation has been removed — findings are surfaced through the console
+summary (CLI) and the web UI.
 
 ## Responsibilities
-- Aggregate findings from all modules  
-- Normalize vulnerability data  
-- Attach severity classifications  
-- Incorporate AI-generated analysis when available  
-- Generate reports in Markdown or JSON formats  
-- Provide a consistent output structure for stakeholders  
+- Aggregate findings from all modules
+- Deduplicate findings (by title + endpoint)
+- Attach severity classifications and counts
+- Incorporate AI-generated analysis when available
+- Print a consistent, coloured console summary
 
 ## How It Works
-After all testing modules complete execution, the Reporter collects their findings and organizes them into a unified report.
+After all testing modules complete execution, the Reporter collects their
+findings, deduplicates them, and organizes them by severity.
 
-Each finding is structured to include relevant metadata such as vulnerability type, severity, supporting evidence, and contextual notes. When AI-assisted analysis is enabled, the module appends executive summaries, risk insights, and recommended next steps.
-
-The Reporter ensures that results are presented in a format suitable for both technical teams and security leadership.
+Each finding carries metadata such as vulnerability type, severity, description,
+impact, and remediation. When AI-assisted analysis is enabled, the module also
+holds the AI summary for inclusion in the console output.
 
 ## Inputs
-- Findings from scanning modules  
-- Target endpoint metadata  
-- Optional AI-generated summaries  
-- Output format configuration  
-- Logger data (when applicable)  
+- Findings from scanning modules
+- Target endpoint metadata
+- Optional AI-generated summary
 
 ## Outputs
-- Markdown security reports  
-- JSON-formatted findings  
-- Consolidated vulnerability summaries  
-- AI-enhanced risk narratives (optional)  
+- Deduplicated, severity-sorted findings (consumed by the CLI summary and the
+  web API)
+- Severity counts
+- A coloured console summary
 
 ## Dependencies
-The Reporter interacts with several shared components:
-
-- **Testing Modules** — supply vulnerability findings  
-- **AI Agent** — provides post-scan analysis (optional)  
-- **GrapeLogger** — contributes contextual telemetry  
+- **Testing Modules** — supply vulnerability findings
+- **AI Agent** — provides an optional post-scan analysis summary
 
 ## Execution Flow
-1. Collect findings from all completed modules  
-2. Normalize vulnerability data into a standard structure  
-3. Assign severity indicators  
-4. Append AI analysis when configured  
-5. Format the report based on user preference  
-6. Write the report to the specified output location  
+1. Collect findings from all completed modules
+2. Deduplicate into a standard structure
+3. Assign severity indicators and counts
+4. Hold AI analysis when configured
+5. Print the console summary (or return data to the web API)
 
 ## Failure Handling
-The module is designed to ensure report reliability:
-
-- Missing findings result in an empty but valid report  
-- AI service failures do not prevent report generation  
-- File write errors surface clear diagnostics  
-- Partial data is preserved whenever possible  
-
-These safeguards ensure scan results are never lost.
+- Missing findings produce a valid "no vulnerabilities found" summary
+- AI service failures do not prevent the summary from printing
+- Partial data is preserved whenever possible
 
 ## Extension Points
-Developers can enhance reporting capabilities by:
-
-- Adding support for additional output formats  
-- Integrating with ticketing systems  
-- Exporting findings to SIEM platforms  
-- Customizing report templates  
-- Introducing compliance-ready report structures  
-
-This flexibility enables the Reporter to adapt to diverse organizational workflows.
+- Consuming the aggregated findings from the web API for custom exports
+- Integrating with ticketing or SIEM platforms downstream
+- Adjusting severity ordering or summary formatting

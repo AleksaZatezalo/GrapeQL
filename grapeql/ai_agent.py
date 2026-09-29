@@ -1,29 +1,27 @@
 """
 GrapeQL AI Agent
 Author: Aleksa Zatezalo
-Version: 2.0
+Version: 3.0
 Date: February 2025
-Description: Post-scan AI analysis module. Sends collected findings to the
-             Anthropic Messages API and returns a structured executive summary
-             with prioritised next steps for further testing. Version 2.0 adds
-             GraphQL schema analysis and intelligent payload suggestions.
+Description: Post-scan AI analysis module. Sends collected findings to a Qwen
+             model over an OpenAI-compatible API (default: local Ollama) and
+             returns a structured executive summary with prioritised next steps
+             for further testing. Version 2.0 added GraphQL schema analysis and
+             intelligent payload suggestions. Version 3.0 switched the backend
+             to a local Qwen model.
 """
 
 import json
 from typing import Dict, List, Optional
 
-import httpx
-
 from .utils import GrapePrinter, Finding
+from .qwen import chat_completion, QwenError, get_model
 
 # ------------------------------------------------------------------ #
 #  Constants
 # ------------------------------------------------------------------ #
 
-_API_URL = "https://api.anthropic.com/v1/messages"
-_MODEL = "claude-sonnet-4-20250514"
 _MAX_TOKENS = 8192
-_API_VERSION = "2023-06-01"
 
 _SYSTEM_PROMPT = """\
 You are a senior penetration tester writing the AI-assisted analysis section \
@@ -34,10 +32,9 @@ You will receive:
   1. The target endpoint URL.
   2. A JSON array of findings produced by GrapeQL's scan modules.
   3. The complete GraphQL introspection schema (if available).
-  4. An optional free-form message from the operator.
 
-Your job is to produce a comprehensive, actionable Markdown section that will be \
-appended directly to the report.  Use the following structure exactly:
+Your job is to produce a comprehensive, actionable Markdown section.  Use the \
+following structure exactly:
 
 ## AI Analysis
 
@@ -131,17 +128,26 @@ class AIAgent:
     the discovered schema structure.
 
     Usage:
-        agent = AIAgent(api_key="sk-ant-...")
+        agent = AIAgent()  # uses a local Qwen model via Ollama by default
         summary_md = await agent.analyse(
             target="http://localhost:5013/graphql",
             findings=[...],
             schema=client.schema,
-            message="Focus on SSRF chains.",
         )
-        # summary_md is a Markdown string ready to append to the report.
+        # summary_md is a Markdown string with the analysis.
+
+    Configuration is read from the environment (QWEN_BASE_URL / QWEN_MODEL /
+    QWEN_API_KEY) or may be overridden via constructor arguments.
     """
 
-    def __init__(self, api_key: str):
+    def __init__(
+        self,
+        base_url: Optional[str] = None,
+        model: Optional[str] = None,
+        api_key: Optional[str] = None,
+    ):
+        self.base_url = base_url
+        self.model = model
         self.api_key = api_key
         self.printer = GrapePrinter()
 
@@ -154,7 +160,6 @@ class AIAgent:
         target: str,
         findings: List[Finding],
         schema: Optional[Dict] = None,
-        message: Optional[str] = None,
     ) -> str:
         """Assemble the user-turn content sent to the model."""
         findings_json = json.dumps(
@@ -174,9 +179,6 @@ class AIAgent:
         else:
             parts.append("\n**GraphQL Schema:** Not available")
 
-        if message:
-            parts.append(f"\n**Operator message:** {message}")
-
         return "\n".join(parts)
 
     # ------------------------------------------------------------------ #
@@ -188,17 +190,15 @@ class AIAgent:
         target: str,
         findings: List[Finding],
         schema: Optional[Dict] = None,
-        message: Optional[str] = None,
     ) -> Optional[str]:
         """
-        Send findings and schema to the Anthropic Messages API and return
-        the AI analysis as a Markdown string.
+        Send findings and schema to the Qwen model and return the AI analysis
+        as a Markdown string.
 
         Args:
             target: The GraphQL endpoint URL
             findings: List of Finding objects from scan modules
             schema: Optional GraphQL introspection schema dictionary
-            message: Optional operator message to guide analysis
 
         Returns:
             Markdown string with AI analysis, or None on failure.
@@ -209,65 +209,42 @@ class AIAgent:
             )
             return None
 
-        self.printer.print_msg("Generating enhanced AI analysis with schema review...", status="log")
+        self.printer.print_msg(
+            f"Generating AI analysis with Qwen ({get_model(self.model)})...",
+            status="log",
+        )
 
-        user_content = self._build_user_prompt(target, findings, schema, message)
+        user_content = self._build_user_prompt(target, findings, schema)
 
-        payload = {
-            "model": _MODEL,
-            "max_tokens": _MAX_TOKENS,
-            "system": _SYSTEM_PROMPT,
-            "messages": [{"role": "user", "content": user_content}],
-        }
-
-        headers = {
-            "x-api-key": self.api_key,
-            "anthropic-version": _API_VERSION,
-            "content-type": "application/json",
-        }
+        messages = [
+            {"role": "system", "content": _SYSTEM_PROMPT},
+            {"role": "user", "content": user_content},
+        ]
 
         try:
-            async with httpx.AsyncClient(timeout=120) as client:
-                resp = await client.post(_API_URL, json=payload, headers=headers)
+            data = await chat_completion(
+                messages,
+                base_url=self.base_url,
+                model=self.model,
+                api_key=self.api_key,
+                max_tokens=_MAX_TOKENS,
+                temperature=0.4,
+            )
+        except QwenError as exc:
+            self.printer.print_msg(str(exc), status="error")
+            return None
 
-            if resp.status_code != 200:
-                body = resp.text[:500]
-                self.printer.print_msg(
-                    f"Anthropic API error ({resp.status_code}): {body}",
-                    status="error",
-                )
-                return None
-
-            data = resp.json()
-            # Extract text blocks from the response content array
-            text_parts = [
-                block["text"]
-                for block in data.get("content", [])
-                if block.get("type") == "text"
-            ]
-
-            if not text_parts:
-                self.printer.print_msg(
-                    "Anthropic API returned no text content", status="error"
-                )
-                return None
-
-            summary = "\n".join(text_parts)
-            self.printer.print_msg("AI analysis complete", status="success")
-            return summary
-
-        except httpx.TimeoutException:
+        try:
+            summary = data["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as exc:
             self.printer.print_msg(
-                "Anthropic API request timed out (120s)", status="error"
+                f"Unexpected response from Qwen endpoint: {exc}", status="error"
             )
             return None
-        except httpx.RequestError as exc:
-            self.printer.print_msg(
-                f"Network error calling Anthropic API: {exc}", status="error"
-            )
+
+        if not summary:
+            self.printer.print_msg("Qwen returned empty content", status="error")
             return None
-        except (KeyError, json.JSONDecodeError) as exc:
-            self.printer.print_msg(
-                f"Failed to parse Anthropic API response: {exc}", status="error"
-            )
-            return None
+
+        self.printer.print_msg("AI analysis complete", status="success")
+        return summary

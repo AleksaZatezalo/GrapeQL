@@ -26,3 +26,7 @@ htmlcov/
 
 # Misc
 .DS_Store
+
+# Frontend build artifacts
+frontend/node_modules/
+frontend/dist/

@@ -79,8 +79,6 @@ The CLI is the main orchestrator. It parses arguments, builds shared infrastruct
 | `--auth` | `str` | Authorization token value. |
 | `--auth-type` | `str` | Token prefix (default: `Bearer`). |
 | `--cookie` | `str` (repeatable) | Cookie in `name:value` format. |
-| `--report` | `str` | Output file path for the report. |
-| `--report-format` | `str` | `markdown` (default) or `json`. |
 | `--username` | `str` | Username for injection testing (default: `admin`). |
 | `--password` | `str` | Password for injection testing (default: `changeme`). |
 | `--log-file` | `str` | Path to structured log file. Omit for stdout. |
@@ -89,8 +87,9 @@ The CLI is the main orchestrator. It parses arguments, builds shared infrastruct
 | `--schema-file` | `str` | Path to a JSON introspection schema file. |
 | `--listener-ip` | `str` | IP for the local OOB callback listener. |
 | `--listener-port` | `int` | Port for the local OOB callback listener. |
-| `--ai-key` | `str` | Anthropic API key for AI-assisted analysis. |
-| `--ai-message` | `str` | Free-form guidance for the AI agent. |
+| `--ai` | `flag` | Enable AI-assisted analysis (local Qwen via Ollama). |
+| `--ai-url` | `str` | OpenAI-compatible base URL (default `http://localhost:11434/v1`). |
+| `--ai-model` | `str` | Qwen model/tag (default `qwen2.5-coder:7b`). |
 
 ### Key Methods
 
@@ -104,7 +103,7 @@ The CLI is the main orchestrator. It parses arguments, builds shared infrastruct
 
 **`_run_module(module_name, client, args, logger, loader, baseline)`** — Instantiates a test module by name, copies the client state, applies module-specific configuration (credentials, OOB listener), runs the test, and collects findings.
 
-**`main()`** — Top-level async flow: parse args → validate → build infrastructure → load schema → run modules → AI analysis → report.
+**`main()`** — Top-level async flow: parse args → validate → build infrastructure → load schema → run modules → optional AI analysis → print findings summary.
 
 ### Usage Examples
 
@@ -121,9 +120,8 @@ grapeql --api http://localhost:5013/graphql \
 grapeql --api http://localhost:5013/graphql \
     --modules injection --include dvga_oob
 
-# Full scan with AI summary
-grapeql --api https://example.com/graphql \
-    --report report.md --ai-key sk-ant-api03-...
+# Full scan with local AI summary (Qwen via Ollama)
+grapeql --api https://example.com/graphql --ai
 
 # Pre-captured schema + logging
 grapeql --api https://example.com/graphql \
@@ -575,93 +573,66 @@ The DoS tester includes a 5-second sleep between attack types to allow the targe
 ## AI Agent
 
 **File:** `ai_agent.py`  
-**Version:** 1.0  
+**Version:** 3.0  
 **Class:** `AIAgent`
 
-Post-scan analysis module. Sends collected findings to the Anthropic Messages API and returns a structured executive summary with prioritised next steps.
+Post-scan analysis module. Sends collected findings to a local Qwen model over an OpenAI-compatible API (default: Ollama) and returns a structured executive summary with prioritised next steps.
 
 ### How It Works
 
-The AI agent is not a `VulnerabilityTester` subclass — it doesn't scan anything. It runs after all modules complete but before report generation. It serialises all findings to JSON, builds a prompt with a system message constraining the output structure, and calls the Claude API.
+The AI agent is not a `VulnerabilityTester` subclass — it doesn't scan anything. It runs after all modules complete. It serialises all findings (and the schema, if available) to JSON, builds a prompt with a system message constraining the output structure, and calls the model via the shared `grapeql.qwen` client.
 
 ### API Details
 
 | Setting | Value |
 |---|---|
-| Endpoint | `https://api.anthropic.com/v1/messages` |
-| Model | `claude-sonnet-4-20250514` |
-| Max tokens | 4096 |
-| Timeout | 120 seconds |
+| Transport | OpenAI-compatible `/chat/completions` |
+| Base URL | `QWEN_BASE_URL` (default `http://localhost:11434/v1`) |
+| Model | `QWEN_MODEL` (default `qwen2.5-coder:7b`) |
+| Auth | Optional `QWEN_API_KEY` (none for local Ollama) |
 | HTTP client | `httpx.AsyncClient` (async) |
 
 ### Output Structure
 
-The system prompt constrains Claude to produce exactly four sections:
-
-1. **Executive Summary** — 2–4 sentences characterising overall security posture.
-2. **Risk Analysis** — Per-finding impact and chaining analysis for CRITICAL/HIGH findings.
-3. **Recommended Next Steps** — Numbered list of manual testing actions.
-4. **Gaps in Coverage** — Attack classes the automated scan may have missed.
+The system prompt constrains the model to produce sections including an Executive Summary, Schema Analysis, Risk Analysis, Recommended Next Steps, Suggested Additional Payloads, and Gaps in Coverage.
 
 ### Usage
 
 ```python
-agent = AIAgent(api_key="sk-ant-api03-...")
+agent = AIAgent()  # or AIAgent(base_url=..., model=...)
 summary_md = await agent.analyse(
     target="http://localhost:5013/graphql",
     findings=reporter.findings,
-    message="Focus on SSRF chains",
+    schema=client.schema,
 )
-# summary_md is a Markdown string appended to the report
+# summary_md is a Markdown string with the analysis
 ```
 
 ### Error Handling
 
-The agent handles: HTTP errors (non-200 status), timeouts (120s), network errors, and malformed responses. On any failure, it prints an error and returns `None` — the report is generated without the AI section.
+The shared client raises `QwenError` on unreachable endpoints, non-200 status, or invalid JSON. On any failure, `analyse` prints an error and returns `None`.
 
 ---
 
-## Reporter
+## Findings Collector
 
 **File:** `reporter.py`  
-**Version:** 2.2  
+**Version:** 3.0  
 **Class:** `Reporter`
 
-Generates reports from accumulated findings in Markdown or JSON format.
+Aggregates accumulated findings (deduplication, severity counts, sorting) and prints a console summary. File-based report generation was removed in v3.0 — findings are surfaced via the console summary (CLI) and the web UI.
 
 ### Key Methods
 
-**`set_target(target)`** — Sets the target URL for the report header.
+**`set_target(target)`** — Sets the target URL for the summary.
 
 **`add_findings(findings)`** / **`add_finding(finding)`** — Adds findings with deduplication (by title + endpoint).
 
-**`set_ai_summary(summary)`** — Stores the AI analysis markdown for inclusion in reports.
+**`set_ai_summary(summary)`** — Stores the AI analysis markdown for the console summary.
 
-**`generate_markdown(output_file)`** — Writes a Markdown report with sections: Executive Summary, Findings Summary (severity table), Detailed Findings, Remediation Summary, and AI Analysis (if available).
+**`_severity_counts()` / `_sorted_findings()`** — Aggregation helpers used by the CLI summary and the web API.
 
-**`generate_json(output_file)`** — Writes a JSON report with target, timestamp, findings array, and `ai_analysis` key (if available).
-
-**`print_summary()`** — Prints a coloured console summary with severity breakdown and critical/high finding highlights.
-
-**`generate_report(output_format, output_file)`** — Dispatch method that calls the appropriate generator and then `print_summary()`.
-
-### Report Structure (Markdown)
-
-```markdown
-# GrapeQL Security Assessment Report
-## Target: ...
-## Date: ...
-## Executive Summary
-## Findings Summary (table)
-## Detailed Findings (per finding)
-## Remediation Summary (grouped by remediation action)
----
-## AI Analysis (if --ai-key was provided)
-### Executive Summary
-### Risk Analysis
-### Recommended Next Steps
-### Gaps in Coverage
-```
+**`print_summary()`** — Prints a coloured console summary with severity breakdown, critical/high finding highlights, and the AI analysis (if present).
 
 ---
 

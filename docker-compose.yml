@@ -1,0 +1,19 @@
+services:
+  grapeql:
+    build: .
+    image: grapeql-ui:latest
+    # Host networking so the container shares your machine's network stack.
+    # This means you can scan targets by localhost / 127.0.0.1 / any host IP,
+    # and the app reaches a local Ollama on 127.0.0.1:11434 with no extra setup.
+    # The app listens on 0.0.0.0:8000 -> open http://localhost:8000
+    network_mode: host
+    environment:
+      # OpenAI-compatible Qwen endpoint (local Ollama by default) and model.
+      - QWEN_BASE_URL=${QWEN_BASE_URL:-http://localhost:11434/v1}
+      - QWEN_MODEL=${QWEN_MODEL:-qwen2.5-coder:7b}
+    volumes:
+      # Persist editable / uploaded test cases across container restarts.
+      - grapeql-testcases:/data/test_cases
+
+volumes:
+  grapeql-testcases:

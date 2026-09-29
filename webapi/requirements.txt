@@ -1,0 +1,5 @@
+# Web API runtime dependencies (in addition to the grapeql package itself)
+fastapi>=0.110
+uvicorn[standard]>=0.29
+pydantic>=2.6
+pyyaml>=6.0

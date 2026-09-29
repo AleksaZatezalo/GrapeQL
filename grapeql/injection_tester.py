@@ -327,16 +327,19 @@ class InjectionTester(VulnerabilityTester):
         arg_name: str,
         test_case: Dict,
         is_mutation: bool,
-    ) -> Tuple[bool, Optional[str], float]:
+    ) -> Tuple[bool, Optional[str], float, Optional[Dict]]:
         """
         Send one payload to one field.arg and check indicators.
+
+        Returns (is_vulnerable, detail, duration, evidence) where evidence is the
+        concrete request that triggered the finding (query + payload), or None.
         """
         payload = test_case["payload"]
         indicators = test_case.get("indicators", [])
 
         query = self._build_query(field_name, arg_name, payload, is_mutation)
         if not query:
-            return False, None, 0.0
+            return False, None, 0.0, None
 
         self.client.set_log_context("InjectionTester", test_case.get("name", "?"))
 
@@ -351,7 +354,7 @@ class InjectionTester(VulnerabilityTester):
         self._record_response_time(duration)
 
         if error:
-            return False, None, duration
+            return False, None, duration, None
 
         response_text = json.dumps(response)
 
@@ -361,9 +364,16 @@ class InjectionTester(VulnerabilityTester):
                     f"Possible injection in {field_name}.{arg_name} "
                     f"with payload: {payload}"
                 )
-                return True, detail, duration
+                evidence = {
+                    "query": query,
+                    "variables": None,
+                    "payload": payload,
+                    "field": f"{field_name}.{arg_name}",
+                    "matched_indicator": indicator,
+                }
+                return True, detail, duration, evidence
 
-        return False, None, duration
+        return False, None, duration, None
 
     async def _scan_field(
         self,
@@ -398,7 +408,7 @@ class InjectionTester(VulnerabilityTester):
             )
 
             for tc in test_cases:
-                is_vuln, detail, _ = await self._test_field(
+                is_vuln, detail, _, evidence = await self._test_field(
                     field_name, arg_name, tc, is_mutation
                 )
                 if is_vuln:
@@ -419,6 +429,7 @@ class InjectionTester(VulnerabilityTester):
                         endpoint=self.client.endpoint,
                         impact=impact,
                         remediation=remediation,
+                        evidence=evidence,
                     )
                     findings.append(finding)
                     self.add_finding(finding)

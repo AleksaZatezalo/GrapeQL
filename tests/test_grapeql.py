@@ -148,7 +148,7 @@ class TestFinding:
 
     def test_to_dict_keys(self):
         d = Finding(title="T", severity="LOW", description="d", endpoint="e", impact="i", remediation="r").to_dict()
-        assert set(d.keys()) == {"title", "severity", "description", "endpoint", "impact", "remediation", "timestamp"}
+        assert set(d.keys()) == {"title", "severity", "description", "endpoint", "impact", "remediation", "evidence", "timestamp"}
 
     def test_str(self):
         s = str(Finding(title="T", severity="HIGH", description="d", endpoint="http://x"))
@@ -609,45 +609,47 @@ class TestDosTester:
 
 class TestAIAgent:
     def test_build_prompt(self, sample_findings):
-        p = AIAgent(api_key="sk-test")._build_user_prompt("http://x/graphql", sample_findings, "Focus on SQLi")
-        assert "http://x/graphql" in p and "SQLi" in p and "Focus on SQLi" in p
+        p = AIAgent()._build_user_prompt("http://x/graphql", sample_findings)
+        assert "http://x/graphql" in p and "Findings" in p
 
-    def test_build_prompt_no_message(self, sample_findings):
-        p = AIAgent(api_key="sk-test")._build_user_prompt("http://x/graphql", sample_findings)
-        assert "Operator message" not in p
+    def test_build_prompt_schema(self, sample_findings):
+        p = AIAgent()._build_user_prompt("http://x/graphql", sample_findings, {"types": []})
+        assert "GraphQL Schema" in p
 
     @pytest.mark.asyncio
     async def test_analyse_empty(self):
-        assert await AIAgent(api_key="sk-test").analyse("http://x/graphql", []) is None
+        assert await AIAgent().analyse("http://x/graphql", []) is None
 
     @pytest.mark.asyncio
     async def test_analyse_success(self, sample_findings):
         mock_resp = MagicMock(status_code=200)
-        mock_resp.json.return_value = {"content": [{"type": "text", "text": "## AI Analysis\nDone."}]}
-        with patch("grapeql.ai_agent.httpx.AsyncClient") as MC:
+        mock_resp.json.return_value = {
+            "choices": [{"message": {"content": "## AI Analysis\nDone."}}]
+        }
+        with patch("grapeql.qwen.httpx.AsyncClient") as MC:
             mc = AsyncMock(); mc.post.return_value = mock_resp
             mc.__aenter__ = AsyncMock(return_value=mc); mc.__aexit__ = AsyncMock(return_value=False)
             MC.return_value = mc
-            r = await AIAgent(api_key="sk-test").analyse("http://x/graphql", sample_findings)
+            r = await AIAgent().analyse("http://x/graphql", sample_findings)
             assert r and "AI Analysis" in r
 
     @pytest.mark.asyncio
     async def test_analyse_api_error(self, sample_findings):
         mock_resp = MagicMock(status_code=500, text="err")
-        with patch("grapeql.ai_agent.httpx.AsyncClient") as MC:
+        with patch("grapeql.qwen.httpx.AsyncClient") as MC:
             mc = AsyncMock(); mc.post.return_value = mock_resp
             mc.__aenter__ = AsyncMock(return_value=mc); mc.__aexit__ = AsyncMock(return_value=False)
             MC.return_value = mc
-            assert await AIAgent(api_key="sk-test").analyse("http://x/graphql", sample_findings) is None
+            assert await AIAgent().analyse("http://x/graphql", sample_findings) is None
 
     @pytest.mark.asyncio
-    async def test_analyse_timeout(self, sample_findings):
+    async def test_analyse_unreachable(self, sample_findings):
         import httpx
-        with patch("grapeql.ai_agent.httpx.AsyncClient") as MC:
-            mc = AsyncMock(); mc.post.side_effect = httpx.TimeoutException("t")
+        with patch("grapeql.qwen.httpx.AsyncClient") as MC:
+            mc = AsyncMock(); mc.post.side_effect = httpx.ConnectError("down")
             mc.__aenter__ = AsyncMock(return_value=mc); mc.__aexit__ = AsyncMock(return_value=False)
             MC.return_value = mc
-            assert await AIAgent(api_key="sk-test").analyse("http://x/graphql", sample_findings) is None
+            assert await AIAgent().analyse("http://x/graphql", sample_findings) is None
 
 
 # ===========================================================================
@@ -669,50 +671,21 @@ class TestReporter:
         s = r._sorted_findings()
         assert s[0].severity == "HIGH" and s[-1].severity == "LOW"
 
-    def test_markdown(self, tmp_dir, sample_findings):
+    def test_print_summary(self, sample_findings, capsys):
         r = Reporter(); r.set_target("http://x/graphql"); r.add_findings(sample_findings)
-        p = str(tmp_dir / "r.md"); r.generate_markdown(p)
-        c = Path(p).read_text()
-        assert "# GrapeQL" in c and "SQLi in createPaste" in c
+        r.print_summary()
+        out = capsys.readouterr().out
+        assert "Findings Summary" in out and "Total: 3" in out
 
-    def test_markdown_with_ai(self, tmp_dir, sample_findings):
-        r = Reporter(); r.set_target("http://x/graphql"); r.add_findings(sample_findings)
+    def test_print_summary_with_ai(self, sample_findings, capsys):
+        r = Reporter(); r.add_findings(sample_findings)
         r.set_ai_summary("## AI Analysis\nSummary.")
-        p = str(tmp_dir / "r.md"); r.generate_markdown(p)
-        assert "AI Analysis" in Path(p).read_text()
+        r.print_summary()
+        assert "AI Analysis" in capsys.readouterr().out
 
-    def test_json(self, tmp_dir, sample_findings):
-        r = Reporter(); r.set_target("http://x/graphql"); r.add_findings(sample_findings)
-        p = str(tmp_dir / "r.json"); r.generate_json(p)
-        d = json.loads(Path(p).read_text())
-        assert d["target"] == "http://x/graphql" and d["findings_count"] == 3
-
-    def test_json_with_ai(self, tmp_dir, sample_findings):
-        r = Reporter(); r.set_target("http://x/graphql"); r.add_findings(sample_findings)
-        r.set_ai_summary("AI text")
-        p = str(tmp_dir / "r.json"); r.generate_json(p)
-        assert json.loads(Path(p).read_text())["ai_analysis"] == "AI text"
-
-    def test_json_no_ai_key(self, tmp_dir, sample_findings):
-        r = Reporter(); r.add_findings(sample_findings)
-        p = str(tmp_dir / "r.json"); r.generate_json(p)
-        assert "ai_analysis" not in json.loads(Path(p).read_text())
-
-    def test_dispatch_markdown(self, tmp_dir, sample_findings):
-        r = Reporter(); r.add_findings(sample_findings)
-        p = str(tmp_dir / "r.md"); r.generate_report("markdown", p); assert Path(p).exists()
-
-    def test_dispatch_json(self, tmp_dir, sample_findings):
-        r = Reporter(); r.add_findings(sample_findings)
-        p = str(tmp_dir / "r.json"); r.generate_report("json", p); assert Path(p).exists()
-
-    def test_dispatch_no_file(self, sample_findings, capsys):
-        Reporter().generate_report("json", None)
-        assert "No output file" in capsys.readouterr().out
-
-    def test_dispatch_unsupported(self, tmp_dir, capsys):
-        Reporter().generate_report("xml", str(tmp_dir / "r.xml"))
-        assert "Unsupported" in capsys.readouterr().out
+    def test_print_summary_empty(self, capsys):
+        Reporter().print_summary()
+        assert "No vulnerabilities" in capsys.readouterr().out
 
     def test_print_summary_empty(self, capsys):
         Reporter().print_summary()
@@ -742,19 +715,18 @@ class TestCLI:
             "--modules", "fingerprint", "injection",
             "--proxy", "127.0.0.1:8080", "--auth", "tok",
             "--auth-type", "Token", "--cookie", "s:v",
-            "--report", "o.md", "--report-format", "json",
             "--username", "u", "--password", "p",
             "--log-file", "l.log", "--schema-file", "s.json",
             "--include", "sqli.yaml", "oob.yaml",
             "--listener-ip", "10.0.0.5", "--listener-port", "4444",
-            "--ai-key", "sk-test", "--ai-message", "Focus",
+            "--ai", "--ai-model", "qwen2.5-coder:7b",
         ]
         with patch("sys.argv", argv):
             a = GrapeQL().parse_arguments()
         assert a.modules == ["fingerprint", "injection"]
         assert a.include == ["sqli.yaml", "oob.yaml"]
         assert a.listener_ip == "10.0.0.5" and a.listener_port == 4444
-        assert a.ai_key == "sk-test" and a.ai_message == "Focus"
+        assert a.ai is True and a.ai_model == "qwen2.5-coder:7b"
 
     def test_missing_api(self):
         from grapeql.cli import GrapeQL
@@ -765,3 +737,192 @@ class TestCLI:
         from grapeql.cli import GrapeQL
         with patch("sys.argv", ["grapeql", "--api", "http://x", "--modules", "invalid"]):
             with pytest.raises(SystemExit): GrapeQL().parse_arguments()
+
+class TestExploitTemplate:
+    """The exploit agent fills two functions into a fixed, always-runnable template."""
+
+    def _finding(self):
+        return {
+            "title": 'SQLi in login "quoted"',
+            "severity": "HIGH",
+            "evidence": {"payload": "' OR 1=1--", "query": "{ x }"},
+        }
+
+    def test_extract_func(self):
+        from webapi.exploit_agent import _extract_func
+        code = (
+            "def build_request():\n    return '{ x }', None\n\n\n"
+            "def check_success(status, body):\n    return status == 200\n"
+        )
+        assert _extract_func(code, "build_request").startswith("def build_request()")
+        assert "return status == 200" in _extract_func(code, "check_success")
+        assert _extract_func(code, "missing") is None
+        assert _extract_func("", "build_request") is None
+
+    def test_marker_is_unique_token(self):
+        from webapi.exploit_agent import _make_marker, _MARKER_PREFIX
+        m1, m2 = _make_marker(), _make_marker()
+        assert m1.startswith(_MARKER_PREFIX) and len(m1) > len(_MARKER_PREFIX)
+        assert m1 != m2  # unique per run
+
+    def test_marker_reflected_guard(self):
+        from webapi.exploit_agent import _marker_reflected
+        attempts = [{"response": 'HTTP 200\n{"data": {"x": "GRAPEQL_PROOF_ABC"}}'}]
+        assert _marker_reflected("GRAPEQL_PROOF_ABC", attempts) is True
+        assert _marker_reflected("GRAPEQL_PROOF_ABC", [{"response": '{"data": {}}'}]) is False
+        assert _marker_reflected("GRAPEQL_PROOF_ABC", []) is False
+
+    def test_render_with_agent_functions(self):
+        from webapi.exploit_template import render_exploit
+        b = 'def build_request():\n    return "mutation { login }", None'
+        c = 'def check_success(status, body):\n    return status == 200 and "root" in body'
+        src = render_exploit(
+            target="http://t/graphql", finding=self._finding(), confirmed=True,
+            headers={"Authorization": "Bearer x", "Content-Type": "application/json"},
+            marker="whoami", build_request_func=b, check_success_func=c,
+        )
+        compile(src, "exploit.py", "exec")  # must be runnable
+        assert "mutation { login }" in src
+        assert "Authorization" in src
+        assert src.count("def build_request") == 1
+        # Content-Type is set explicitly by the transport, not duplicated in EXTRA_HEADERS.
+        headers_line = [ln for ln in src.splitlines() if ln.startswith("EXTRA_HEADERS")][0]
+        assert "Content-Type" not in headers_line
+
+    def test_render_drops_broken_function(self):
+        from webapi.exploit_template import render_exploit
+        src = render_exploit(
+            target="http://t/graphql", finding=self._finding(), confirmed=False,
+            headers={}, marker="whoami",
+            build_request_func="def build_request(:\n  broken syntax",
+            fallback_query="{ __typename }",
+        )
+        compile(src, "exploit.py", "exec")  # broken func dropped, still compiles
+        assert "__typename" in src
+        assert "UNVERIFIED" in src
+
+    def test_render_defaults_only(self):
+        from webapi.exploit_template import render_exploit
+        src = render_exploit(
+            target="http://t/graphql", finding=self._finding(),
+            confirmed=False, headers={}, marker="whoami",
+        )
+        compile(src, "exploit.py", "exec")
+        assert "def build_request" in src and "def check_success" in src
+
+    def test_initial_prompt_has_three_inputs(self):
+        from webapi.exploit_agent import _build_initial_prompt, _make_marker
+        f = self._finding()
+        f["evidence"]["query"] = "mutation { login }"
+        p = _build_initial_prompt(
+            "http://localhost:5013/graphql", f, {"types": [{"name": "Query"}]},
+            _make_marker(),
+        )
+        # INPUT 1: triggering request + target URL, INPUT 2: schema, INPUT 3: template.
+        assert "INPUT 1" in p and "http://localhost:5013/graphql" in p
+        assert "INPUT 2" in p and '"types"' in p
+        assert "INPUT 3" in p and "def send_graphql" in p
+
+    @pytest.mark.asyncio
+    async def test_unverified_ships_evidence_not_model_guess(self):
+        """When the agent cannot confirm, the exploit reproduces the real
+        triggering request, never the model's unverified guess."""
+        from webapi import exploit_agent as ea
+        finding = {
+            "title": "Command Injection in paste title", "severity": "CRITICAL",
+            "evidence": {
+                "query": 'mutation { createPaste(title: "x; whoami") { id } }',
+                "variables": None, "payload": "; whoami", "field": "createPaste.title",
+            },
+        }
+
+        async def fake_chat(messages, **kw):
+            content = ("CONFIRMED: false\n```python\n"
+                       "def build_request():\n    return \"{ me }\", None\n\n\n"
+                       "def check_success(status, body):\n    return \"root\" in body\n```")
+            return {"choices": [{"message": {"content": content}}]}
+
+        async def fake_run(http, target, query, variables, headers):
+            return 'HTTP 200\n{"errors":[{"message":"boom"}]}'
+
+        with patch.object(ea, "chat_completion", fake_chat), \
+                patch.object(ea, "_run_graphql", fake_run):
+            res = await ea.generate_exploit(
+                target="http://localhost:5013/graphql", finding=finding,
+                schema=None, iteration_cap=2,
+            )
+        code = res["exploit_code"]
+        compile(code, "exploit.py", "exec")
+        assert res["confirmed"] is False
+        assert "createPaste" in code       # ships the real evidence request
+        assert "{ me }" not in code        # not the model's unverified guess
+        assert "UNVERIFIED" in code
+
+    @pytest.mark.asyncio
+    async def test_bogus_confirmed_is_downgraded(self):
+        """A CONFIRMED claim is rejected unless the proof token was reflected."""
+        from webapi import exploit_agent as ea
+        finding = {
+            "title": "Command Injection in pastes.filter", "severity": "CRITICAL",
+            "evidence": {"query": "{ pastes { id } }", "payload": "x", "field": "pastes.filter"},
+        }
+
+        async def fake_chat(messages, **kw):
+            # Model runs a benign query, gets ordinary data, but claims success.
+            content = ("CONFIRMED: true\n```python\n"
+                       "def build_request():\n    return \"{ users { id } }\", None\n\n\n"
+                       "def check_success(status, body):\n    return status == 200\n```")
+            return {"choices": [{"message": {"content": content}}]}
+
+        async def fake_run(http, target, query, variables, headers):
+            # Response never contains the proof token.
+            return 'HTTP 200\n{"data": {"users": [{"id": "1"}]}}'
+
+        with patch.object(ea, "chat_completion", fake_chat), \
+                patch.object(ea, "_run_graphql", fake_run):
+            res = await ea.generate_exploit(
+                target="http://127.0.0.1:5013/graphql", finding=finding,
+                schema=None, iteration_cap=2,
+            )
+        assert res["confirmed"] is False          # bogus confirmation rejected
+        assert "UNVERIFIED" in res["exploit_code"]
+        assert "proof token" in res["explanation"].lower()
+
+    @pytest.mark.asyncio
+    async def test_unverified_prefers_evidence_over_failed_attempt(self):
+        """A rejected (non-200) guess must not outrank the real evidence request."""
+        from webapi import exploit_agent as ea
+        finding = {
+            "title": "Command Injection in pastes.filter", "severity": "CRITICAL",
+            "evidence": {
+                "query": 'query { pastes(filter: "PAYLOAD") { id } }',
+                "payload": "PAYLOAD", "field": "pastes.filter",
+            },
+        }
+        calls = {"n": 0}
+
+        async def fake_chat(messages, **kw):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                # First: a broken guess treating echo as a GraphQL field.
+                return {"choices": [{"message": {"content":
+                    '{"action":"run_graphql","query":"{ echo }"}'}}]}
+            # Then give up unverified.
+            return {"choices": [{"message": {"content": "CONFIRMED: false\n```python\n"
+                    "def build_request():\n    return \"{ echo }\", None\n```"}}]}
+
+        async def fake_run(http, target, query, variables, headers):
+            return ('HTTP 400\n{"errors":[{"message":"Cannot query field '
+                    '\\"echo\\" on type \\"Query\\"."}]}')
+
+        with patch.object(ea, "chat_completion", fake_chat), \
+                patch.object(ea, "_run_graphql", fake_run):
+            res = await ea.generate_exploit(
+                target="http://127.0.0.1:5013/graphql", finding=finding,
+                schema=None, iteration_cap=3,
+            )
+        code = res["exploit_code"]
+        compile(code, "exploit.py", "exec")
+        assert res["confirmed"] is False
+        assert "pastes(filter:" in code    # ships the real evidence request
+        assert "{ echo }" not in code      # not the rejected 400 guess

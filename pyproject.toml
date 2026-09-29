@@ -37,3 +37,9 @@ Issues = "https://github.com/AleksaZatezalo/grapeql/issues"
 
 [project.scripts]
 grapeql = "grapeql.cli:run_cli"
+
+[tool.setuptools.packages.find]
+include = ["grapeql*"]
+
+[tool.setuptools.package-data]
+grapeql = ["test_cases/**/*.yaml"]
