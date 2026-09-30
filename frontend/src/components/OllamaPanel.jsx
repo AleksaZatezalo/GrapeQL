@@ -82,9 +82,9 @@ export default function OllamaPanel({ onSaved }) {
     <div className="panel">
       <h3 style={{ marginTop: 0 }}>Ollama / Qwen configuration</h3>
       <p className="muted" style={{ marginTop: 0 }}>
-        AI analysis and the exploit agent talk to a Qwen model over an
-        OpenAI-compatible API. By default this is a local Ollama server. Changes
-        here apply immediately to new scans and exploit generations.
+        The exploit agent talks to a Qwen model over an OpenAI-compatible API.
+        By default this is a local Ollama server. Changes here apply immediately
+        to new exploit generations.
       </p>
 
       <label>Base URL (OpenAI-compatible)</label>

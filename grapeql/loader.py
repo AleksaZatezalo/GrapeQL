@@ -15,8 +15,7 @@ Directory layout expected:
     ├── injection/
     │   ├── sqli.yaml
     │   ├── command.yaml
-    │   ├── oob.yaml
-    │   └── dvga_oob.yaml
+    │   └── nosql.yaml
     ├── info/
     │   └── checks.yaml
     └── dos/
@@ -41,8 +40,8 @@ class TestCaseLoader:
         single_file = loader.load_file("injection/sqli.yaml")
 
         # Only load specific files across all modules:
-        loader.set_include_files(["dvga_oob.yaml", "sqli.yaml"])
-        filtered = loader.load_module("injection")  # only dvga_oob + sqli
+        loader.set_include_files(["command.yaml", "sqli.yaml"])
+        filtered = loader.load_module("injection")  # only command + sqli
     """
 
     def __init__(self, test_cases_dir: str):
@@ -64,7 +63,7 @@ class TestCaseLoader:
         Restrict which YAML files are loaded by ``load_module()``.
 
         Args:
-            filenames: List of basenames (e.g. ["dvga_oob.yaml", "sqli.yaml"]).
+            filenames: List of basenames (e.g. ["command.yaml", "sqli.yaml"]).
                        Extension is optional — ".yaml" is appended if missing.
         """
         normalised: Set[str] = set()

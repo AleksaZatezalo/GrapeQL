@@ -19,7 +19,7 @@ export default function DocsPanel() {
       <Code>{`test_cases/
 ├── fingerprint/   engine detection probes
 ├── info/          information-disclosure checks
-├── injection/     sqli / command / nosql / oob payloads
+├── injection/     sqli / command / nosql payloads
 ├── auth/          authentication-bypass strategies
 └── dos/           denial-of-service techniques`}</Code>
 
@@ -122,7 +122,7 @@ export default function DocsPanel() {
       <p>
         On the <strong>Scan</strong> tab, pick which modules to run. From the CLI
         you can also restrict to specific files with{" "}
-        <code>--include sqli.yaml oob.yaml</code>. New and uploaded files are
+        <code>--include sqli.yaml command.yaml</code>. New and uploaded files are
         picked up automatically on the next scan.
       </p>
 

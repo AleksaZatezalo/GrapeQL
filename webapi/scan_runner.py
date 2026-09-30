@@ -14,7 +14,6 @@ from grapeql.logger import GrapeLogger
 from grapeql.loader import TestCaseLoader
 from grapeql.baseline import BaselineTracker
 from grapeql.reporter import Reporter
-from grapeql.ai_agent import AIAgent
 
 from grapeql.fingerprint import Fingerprinter
 from grapeql.info_tester import InfoTester
@@ -86,9 +85,6 @@ async def run_scan(
     username: Optional[str] = None,
     password: Optional[str] = None,
     schema_dict: Optional[Dict[str, Any]] = None,
-    ai_analysis: bool = False,
-    ai_base_url: Optional[str] = None,
-    ai_model: Optional[str] = None,
     log_lines: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """
@@ -99,7 +95,6 @@ async def run_scan(
           "modules": [str],
           "findings": [ {finding dict}, ... ],
           "counts": {"CRITICAL": n, ...},
-          "ai_analysis": str | None,
         }
     """
     logger = GrapeLogger()
@@ -138,6 +133,10 @@ async def run_scan(
     resolved = _resolve_modules(modules)
     log(f"Running modules: {', '.join(resolved)}")
 
+    # The stack identified by the fingerprint module (engine, technologies,
+    # CVEs). Forwarded to the exploit agent as one of its PoC inputs.
+    stack: Optional[Dict[str, Any]] = None
+
     for module_name in resolved:
         cls = MODULE_CLASSES[module_name]
         instance = cls(logger=logger, loader=loader, baseline=baseline)
@@ -153,23 +152,10 @@ async def run_scan(
             instance.set_credentials(username or "admin", password or "changeme")
 
         await instance.run_test()
+        if module_name == "fingerprint":
+            stack = getattr(instance, "stack", None)
         reporter.add_findings(instance.get_findings())
         log(f"Finished {module_name}: {len(instance.get_findings())} findings")
-
-    ai_summary: Optional[str] = None
-    if ai_analysis and reporter.findings:
-        log("Requesting AI analysis from Qwen...")
-        agent = AIAgent(base_url=ai_base_url, model=ai_model)
-        ai_summary = await agent.analyse(
-            target=target,
-            findings=reporter.findings,
-            schema=primary.schema,
-        )
-        if ai_summary:
-            reporter.set_ai_summary(ai_summary)
-            log("AI analysis complete.")
-        else:
-            log("AI analysis returned no content.")
 
     findings: List[Finding] = reporter._sorted_findings()
 
@@ -179,8 +165,10 @@ async def run_scan(
         "findings": [f.to_dict() for f in findings],
         "counts": reporter._severity_counts(),
         "total": len(findings),
-        "ai_analysis": ai_summary,
         # Return the introspected schema so the exploit agent can craft
         # valid queries without the operator having to paste it in.
         "schema": primary.schema,
+        # Return the fingerprinted stack (engine, technologies, CVEs) so the
+        # exploit agent can tailor a PoC to the identified implementation.
+        "stack": stack,
     }

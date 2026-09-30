@@ -4,9 +4,6 @@ Author: Aleksa Zatezalo
 Version: 3.4
 Date: February 2025
 Description: CLI for GrapeQL GraphQL Security Testing Tool.
-             v3.3: Added --listener-ip / --listener-port for OOB testing.
-             v3.4: Added --ai for AI-assisted analysis.
-             v3.5: AI analysis now uses a local Qwen model (OpenAI-compatible).
 """
 
 import asyncio
@@ -17,7 +14,6 @@ import sys
 from typing import List, Set
 
 from .utils import GrapePrinter
-from .ai_agent import AIAgent
 from .auth_tester import AuthTester
 from .client import GraphQLClient
 from .fingerprint import Fingerprinter
@@ -81,27 +77,16 @@ Examples:
   # Full scan including DoS
   grapeql --api https://example.com/graphql --modules fingerprint info injection dos
 
-  # Injection with OOB listener
-  grapeql --api https://example.com/graphql \\
-      --modules injection --listener-ip 10.0.0.5 --listener-port 4444
-
   # Use a pre-captured schema (introspection is still probed but not required)
   grapeql --api https://example.com/graphql --schema-file schema.json
 
-  # Only run DVGA OOB payloads
+  # Only run specific injection payload files
   grapeql --api http://localhost:5013/graphql \\
-      --modules injection --include dvga_oob
+      --modules injection --include sqli command
 
   # Combine: specific modules + supplied schema + logging
   grapeql --api https://example.com/graphql \\
       --modules injection --schema-file schema.json --log-file scan.log
-
-  # Full scan with AI-assisted analysis (local Qwen via Ollama)
-  grapeql --api https://example.com/graphql --ai
-
-  # AI analysis with a specific model
-  grapeql --api https://example.com/graphql \\
-      --ai --ai-model qwen2.5-coder:7b
             """,
         )
 
@@ -146,7 +131,7 @@ Examples:
             metavar="FILE",
             help=(
                 "Only run test cases from these YAML files (basename, e.g. "
-                "'dvga_oob.yaml sqli.yaml').  Extension is optional.  "
+                "'sqli.yaml command.yaml').  Extension is optional.  "
                 "Applies across all modules."
             ),
         )
@@ -156,48 +141,6 @@ Examples:
                 "Path to a JSON introspection schema. When provided, this schema "
                 "is used for all testing. Live introspection is still attempted "
                 "to check whether it is enabled, but is not required."
-            ),
-        )
-
-        # ── OOB listener ────────────────────────────────────────────
-        parser.add_argument(
-            "--listener-ip",
-            help=(
-                "IP address for the local OOB callback listener. "
-                "Enables out-of-band injection testing when used with --listener-port."
-            ),
-        )
-        parser.add_argument(
-            "--listener-port",
-            type=int,
-            help=(
-                "Port for the local OOB callback listener. "
-                "Enables out-of-band injection testing when used with --listener-ip."
-            ),
-        )
-
-        # ── AI analysis ─────────────────────────────────────────────
-        parser.add_argument(
-            "--ai",
-            action="store_true",
-            help=(
-                "Enable AI-assisted analysis. Findings are sent to a local Qwen "
-                "model (OpenAI-compatible, default: Ollama) for an executive "
-                "summary and recommended next steps appended to the report."
-            ),
-        )
-        parser.add_argument(
-            "--ai-url",
-            help=(
-                "OpenAI-compatible base URL for the Qwen model "
-                "(default: env QWEN_BASE_URL or http://localhost:11434/v1)."
-            ),
-        )
-        parser.add_argument(
-            "--ai-model",
-            help=(
-                "Qwen model name/tag to use "
-                "(default: env QWEN_MODEL or qwen2.5-coder:7b)."
             ),
         )
 
@@ -343,10 +286,6 @@ Examples:
                 args.password or "changeme",
             )
 
-        # Apply OOB listener config to injection tester
-        if module_name == "injection" and args.listener_ip and args.listener_port:
-            instance.set_listener(args.listener_ip, args.listener_port)
-
         await instance.run_test()
         self.reporter.add_findings(instance.get_findings())
 
@@ -358,14 +297,6 @@ Examples:
         try:
             args = self.parse_arguments()
             self.printer.intro()
-
-            # Validate listener args come as a pair
-            if bool(args.listener_ip) != bool(args.listener_port):
-                self.printer.print_msg(
-                    "--listener-ip and --listener-port must be used together",
-                    status="error",
-                )
-                return 1
 
             # -- Shared infrastructure --
             logger = GrapeLogger(log_file=args.log_file)
@@ -410,17 +341,6 @@ Examples:
                     f"avg={agg['mean']:.3f}s, stddev={agg['stddev']:.3f}s",
                     status="log",
                 )
-
-            # -- AI analysis (optional) --
-            if args.ai:
-                agent = AIAgent(base_url=args.ai_url, model=args.ai_model)
-                ai_summary = await agent.analyse(
-                    target=args.api,
-                    findings=self.reporter.findings,
-                    schema=primary_client.schema,
-                )
-                if ai_summary:
-                    self.reporter.set_ai_summary(ai_summary)
 
             # -- Findings summary --
             self.reporter.print_summary()

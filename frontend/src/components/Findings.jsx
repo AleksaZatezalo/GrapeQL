@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import ReactMarkdown from "react-markdown";
 import { api } from "../api.js";
 
 const SEV_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"];
@@ -31,6 +30,7 @@ function ExploitControls({ finding, context }) {
         target: context.target,
         finding,
         graphql_schema: context.graphql_schema || null,
+        stack: context.stack || null,
         auth: context.auth || null,
       });
 
@@ -133,7 +133,7 @@ function ExploitControls({ finding, context }) {
 export default function Findings({ result, context }) {
   if (!result) return null;
 
-  const { counts = {}, findings = [], ai_analysis, target, total } = result;
+  const { counts = {}, findings = [], target, total } = result;
 
   return (
     <div className="panel">
@@ -185,12 +185,6 @@ export default function Findings({ result, context }) {
           <ExploitControls finding={f} context={context} />
         </div>
       ))}
-
-      {ai_analysis && (
-        <div className="ai">
-          <ReactMarkdown>{ai_analysis}</ReactMarkdown>
-        </div>
-      )}
     </div>
   );
 }

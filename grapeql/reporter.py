@@ -10,7 +10,7 @@ Description: Aggregates GrapeQL findings (deduplication, severity counts) and
 """
 
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List
 from .utils import GrapePrinter, Finding
 
 _SEVERITY_ORDER = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "INFO": 4}
@@ -25,14 +25,9 @@ class Reporter:
         self.findings: List[Finding] = []
         self.target = "unknown"
         self.scan_time = time.strftime("%Y-%m-%d_%H-%M-%S")
-        self._ai_summary: Optional[str] = None
 
     def set_target(self, target: str) -> None:
         self.target = target
-
-    def set_ai_summary(self, summary: str) -> None:
-        """Store the AI-generated analysis section for inclusion in reports."""
-        self._ai_summary = summary
 
     def add_findings(self, findings: List[Finding]) -> None:
         for finding in findings:
@@ -102,7 +97,3 @@ class Reporter:
                         f"{self.printer.RED}{finding.severity}: "
                         f"{finding.title} - {finding.endpoint}{self.printer.END}"
                     )
-
-        if self._ai_summary:
-            self.printer.print_section("AI Analysis")
-            print(self._ai_summary)

@@ -27,6 +27,10 @@ htmlcov/
 # Misc
 .DS_Store
 
+# Runtime report database
+reports.db
+*.db
+
 # Frontend build artifacts
 frontend/node_modules/
 frontend/dist/

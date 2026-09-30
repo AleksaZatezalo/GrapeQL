@@ -40,6 +40,22 @@ export const api = {
   startExploit: (payload) =>
     request("/api/exploit", { method: "POST", body: JSON.stringify(payload) }),
   exploitStatus: (jobId) => request(`/api/exploit/${jobId}`),
+  listReports: () => request("/api/reports"),
+  getReport: (id) => request(`/api/reports/${id}`),
+  updateReport: (id, payload) =>
+    request(`/api/reports/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  deleteReport: (id) => request(`/api/reports/${id}`, { method: "DELETE" }),
+  listExploits: () => request("/api/exploits"),
+  getExploit: (id) => request(`/api/exploits/${id}`),
+  updateExploit: (id, payload) =>
+    request(`/api/exploits/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  deleteExploit: (id) => request(`/api/exploits/${id}`, { method: "DELETE" }),
   getOllama: () => request("/api/ollama"),
   setOllama: (payload) =>
     request("/api/ollama", { method: "PUT", body: JSON.stringify(payload) }),

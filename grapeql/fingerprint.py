@@ -29,6 +29,9 @@ class Fingerprinter(VulnerabilityTester):
         self.test_name = "GraphQL Fingerprinting"
         # test_cases are auto-loaded by VulnerabilityTester from YAML
         self.engines: List[Dict[str, Any]] = self.test_cases
+        # The identified stack (engine name, technologies, CVEs), populated by
+        # run_test(). Consumed by the exploit agent as one of its PoC inputs.
+        self.stack: Optional[Dict[str, Any]] = None
 
     # ------------------------------------------------------------------ #
     #  Probe helpers
@@ -185,5 +188,5 @@ class Fingerprinter(VulnerabilityTester):
 
     async def run_test(self) -> List[Finding]:
         """VulnerabilityTester interface — delegates to fingerprint()."""
-        await self.fingerprint()
+        self.stack = await self.fingerprint()
         return self.findings

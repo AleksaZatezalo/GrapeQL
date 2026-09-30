@@ -120,7 +120,6 @@ Capabilities include:
 
 - SQL injection detection  
 - Command injection testing  
-- Blind vulnerability discovery via out-of-band callbacks  
 
 Because injection flaws often carry critical severity, this phase represents a core component of the scan.
 

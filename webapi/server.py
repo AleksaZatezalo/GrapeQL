@@ -12,9 +12,17 @@ Exposes:
   PUT    /api/testcases/{module}/{file}    -> save / edit YAML (validated)
   POST   /api/testcases/{module}/{file}    -> create new YAML file (validated)
   DELETE /api/testcases/{module}/{file}    -> remove a YAML file
-  POST   /api/scan                         -> run a scan, return findings + AI analysis
+  POST   /api/scan                         -> run a scan, return findings
   POST   /api/exploit                      -> start an exploit-generation job -> {job_id}
   GET    /api/exploit/{job_id}             -> poll job status/result
+  GET    /api/reports                      -> list saved report summaries
+  GET    /api/reports/{id}                 -> full saved report
+  PUT    /api/reports/{id}                 -> rename / edit a saved report
+  DELETE /api/reports/{id}                 -> delete a saved report
+  GET    /api/exploits                     -> list saved exploit summaries
+  GET    /api/exploits/{id}                -> full saved exploit
+  PUT    /api/exploits/{id}                -> rename / edit a saved exploit
+  DELETE /api/exploits/{id}                -> delete a saved exploit
 
 The bundled test cases are copied into a writable directory on first start so
 they can be edited and extended from the UI without touching the package.
@@ -41,6 +49,8 @@ import grapeql
 from grapeql.qwen import get_base_url, get_model
 from .scan_runner import run_scan, ScanError, ALL_MODULES
 from .exploit_agent import generate_exploit, ExploitAgentError
+from . import reports_store
+from . import exploits_store
 
 # The scan modules print findings (which contain em dashes and other non-ASCII
 # characters) to stdout/stderr. On a host/container without a UTF-8 locale the
@@ -110,6 +120,8 @@ def _validate_yaml(text: str) -> None:
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
     _seed_testcases()
+    reports_store.init_db()
+    exploits_store.init_db()
     yield
 
 
@@ -118,6 +130,8 @@ app = FastAPI(title="GrapeQL Web API", version="1.0.0", lifespan=_lifespan)
 # Also seed eagerly at import time so the directory is ready even when the
 # lifespan startup hook is not triggered (e.g. certain test harnesses).
 _seed_testcases()
+reports_store.init_db()
+exploits_store.init_db()
 
 # In-memory runtime overrides for the Qwen/Ollama connection, set from the UI.
 # ``None`` means "fall back to the environment default" (QWEN_BASE_URL / QWEN_MODEL).
@@ -141,6 +155,7 @@ class TestCaseBody(BaseModel):
 
 class ScanRequest(BaseModel):
     target: str
+    name: Optional[str] = None
     modules: Optional[List[str]] = None
     proxy: Optional[str] = None
     auth: Optional[str] = None
@@ -149,7 +164,6 @@ class ScanRequest(BaseModel):
     username: Optional[str] = None
     password: Optional[str] = None
     graphql_schema: Optional[Dict[str, Any]] = None
-    ai_analysis: bool = False
 
 
 class OllamaConfig(BaseModel):
@@ -157,10 +171,16 @@ class OllamaConfig(BaseModel):
     model: Optional[str] = None
 
 
+class ReportUpdate(BaseModel):
+    name: Optional[str] = None
+    data: Optional[Dict[str, Any]] = None
+
+
 class ExploitRequest(BaseModel):
     target: str
     finding: Dict[str, Any]
     graphql_schema: Optional[Dict[str, Any]] = None
+    stack: Optional[Dict[str, Any]] = None
     auth: Optional[str] = None
     auth_type: str = "Bearer"
     cookies: Optional[List[str]] = None
@@ -324,9 +344,6 @@ async def scan(req: ScanRequest) -> Dict[str, Any]:
             username=req.username,
             password=req.password,
             schema_dict=req.graphql_schema,
-            ai_analysis=req.ai_analysis,
-            ai_base_url=current_base_url(),
-            ai_model=current_model(),
             log_lines=log_lines,
         )
     except ScanError as exc:
@@ -335,7 +352,32 @@ async def scan(req: ScanRequest) -> Dict[str, Any]:
         raise HTTPException(500, f"Scan failed: {exc}")
 
     result["log"] = log_lines
-    return result
+
+    # Persist the scan as a named report. The context is everything the exploit
+    # agent needs to craft PoCs later from the Reports tab (target, auth,
+    # introspected schema) so a report is self-contained.
+    resolved_target = result.get("target") or req.target
+    name = (req.name or "").strip() or f"Scan of {resolved_target}"
+    context = {
+        "target": resolved_target,
+        "auth": req.auth,
+        "graphql_schema": result.get("schema") or req.graphql_schema,
+        "stack": result.get("stack"),
+    }
+    report = reports_store.create_report(
+        name=name,
+        target=resolved_target,
+        data={
+            "name": name,
+            "target": resolved_target,
+            "result": result,
+            "context": context,
+        },
+    )
+
+    # The Scan tab does not render findings — it only reports where the results
+    # were saved. Return just the saved report's identity.
+    return {"report_id": report["id"], "name": name, "target": resolved_target}
 
 
 # Exploit generation runs an agentic loop with many sequential local-LLM calls,
@@ -361,9 +403,27 @@ def _prune_jobs() -> None:
 async def _run_exploit_job(job_id: str, kwargs: Dict[str, Any]) -> None:
     try:
         result = await generate_exploit(**kwargs)
+        # Persist the finished exploit so it appears in the Exploits tab, just
+        # like a scan is saved as a report. The saved record is self-contained:
+        # the finding it targets plus the generated PoC and its verification.
+        target = kwargs.get("target")
+        finding = kwargs.get("finding") or {}
+        title = finding.get("title") or "exploit"
+        name = f"{title} — {target}" if target else title
+        exploit = exploits_store.create_exploit(
+            name=name,
+            target=target,
+            data={
+                "name": name,
+                "target": target,
+                "finding": finding,
+                "result": result,
+            },
+        )
         _EXPLOIT_JOBS[job_id] = {
             "status": "done",
             "result": result,
+            "exploit_id": exploit["id"],
             "finished_at": time.time(),
         }
     except ExploitAgentError as exc:
@@ -408,6 +468,7 @@ async def exploit(req: ExploitRequest) -> Dict[str, Any]:
         target=req.target,
         finding=req.finding,
         schema=req.graphql_schema,
+        stack=req.stack,
         request_headers=headers or None,
         iteration_cap=cap,
         base_url=current_base_url(),
@@ -431,6 +492,70 @@ async def exploit_status(job_id: str) -> Dict[str, Any]:
     if job is None:
         raise HTTPException(404, "Unknown or expired exploit job.")
     return job
+
+
+# ---- reports -------------------------------------------------------------- #
+
+
+@app.get("/api/reports")
+def list_reports() -> List[Dict[str, Any]]:
+    return reports_store.list_reports()
+
+
+@app.get("/api/reports/{report_id}")
+def get_report(report_id: str) -> Dict[str, Any]:
+    report = reports_store.get_report(report_id)
+    if report is None:
+        raise HTTPException(404, "Report not found.")
+    return report
+
+
+@app.put("/api/reports/{report_id}")
+def update_report(report_id: str, body: ReportUpdate) -> Dict[str, Any]:
+    name = (body.name or "").strip() or None if body.name is not None else None
+    report = reports_store.update_report(report_id, name=name, data=body.data)
+    if report is None:
+        raise HTTPException(404, "Report not found.")
+    return report
+
+
+@app.delete("/api/reports/{report_id}")
+def delete_report(report_id: str) -> Dict[str, str]:
+    if not reports_store.delete_report(report_id):
+        raise HTTPException(404, "Report not found.")
+    return {"status": "deleted", "id": report_id}
+
+
+# ---- exploits ------------------------------------------------------------- #
+
+
+@app.get("/api/exploits")
+def list_exploits() -> List[Dict[str, Any]]:
+    return exploits_store.list_exploits()
+
+
+@app.get("/api/exploits/{exploit_id}")
+def get_exploit(exploit_id: str) -> Dict[str, Any]:
+    exploit = exploits_store.get_exploit(exploit_id)
+    if exploit is None:
+        raise HTTPException(404, "Exploit not found.")
+    return exploit
+
+
+@app.put("/api/exploits/{exploit_id}")
+def update_exploit(exploit_id: str, body: ReportUpdate) -> Dict[str, Any]:
+    name = (body.name or "").strip() or None if body.name is not None else None
+    exploit = exploits_store.update_exploit(exploit_id, name=name, data=body.data)
+    if exploit is None:
+        raise HTTPException(404, "Exploit not found.")
+    return exploit
+
+
+@app.delete("/api/exploits/{exploit_id}")
+def delete_exploit(exploit_id: str) -> Dict[str, str]:
+    if not exploits_store.delete_exploit(exploit_id):
+        raise HTTPException(404, "Exploit not found.")
+    return {"status": "deleted", "id": exploit_id}
 
 
 # --------------------------------------------------------------------------- #

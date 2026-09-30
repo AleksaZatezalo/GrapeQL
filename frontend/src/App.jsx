@@ -3,12 +3,16 @@ import { api } from "./api.js";
 import ScanPanel from "./components/ScanPanel.jsx";
 import TestCasePanel from "./components/TestCasePanel.jsx";
 import OllamaPanel from "./components/OllamaPanel.jsx";
+import ReportsPanel from "./components/ReportsPanel.jsx";
+import ExploitsPanel from "./components/ExploitsPanel.jsx";
 import DocsPanel from "./components/DocsPanel.jsx";
 
 const TABS = [
   { id: "scan", label: "Scan" },
   { id: "testcases", label: "Test Cases" },
   { id: "ollama", label: "Ollama" },
+  { id: "reports", label: "Reports" },
+  { id: "exploits", label: "Exploits" },
   { id: "docs", label: "Docs" },
 ];
 
@@ -49,6 +53,8 @@ export default function App() {
       {tab === "scan" && <ScanPanel settings={settings} />}
       {tab === "testcases" && <TestCasePanel />}
       {tab === "ollama" && <OllamaPanel onSaved={loadSettings} />}
+      {tab === "reports" && <ReportsPanel active={tab === "reports"} />}
+      {tab === "exploits" && <ExploitsPanel active={tab === "exploits"} />}
       {tab === "docs" && <DocsPanel />}
     </div>
   );

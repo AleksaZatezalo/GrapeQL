@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../api.js";
-import Findings from "./Findings.jsx";
 
 export default function ScanPanel({ settings }) {
   const allModules = settings?.modules || [
@@ -12,18 +11,15 @@ export default function ScanPanel({ settings }) {
   ];
 
   const [target, setTarget] = useState("");
+  const [reportName, setReportName] = useState("");
   const [selected, setSelected] = useState(["fingerprint", "info", "injection", "auth"]);
-  const [aiAnalysis, setAiAnalysis] = useState(false);
   const [auth, setAuth] = useState("");
   const [schemaText, setSchemaText] = useState("");
   const [running, setRunning] = useState(false);
   const [error, setError] = useState("");
-  const [result, setResult] = useState(null);
-  // Context captured from the scan that produced `result`, reused by the
-  // per-finding exploit generator.
-  const [scanContext, setScanContext] = useState(null);
-
-  const qwenModel = settings?.qwen_model;
+  // Result of saving the scan as a report — findings themselves live only in
+  // the Reports tab, never on this tab.
+  const [saved, setSaved] = useState(null);
 
   useEffect(() => {
     if (settings?.modules) setSelected(settings.modules.filter((m) => m !== "dos"));
@@ -37,7 +33,7 @@ export default function ScanPanel({ settings }) {
 
   async function runScan() {
     setError("");
-    setResult(null);
+    setSaved(null);
     if (!target.trim()) {
       setError("Enter a target GraphQL endpoint URL.");
       return;
@@ -57,20 +53,13 @@ export default function ScanPanel({ settings }) {
     try {
       const payload = {
         target: target.trim(),
+        name: reportName.trim() || null,
         modules: selected,
         auth: auth.trim() || null,
-        ai_analysis: aiAnalysis,
         graphql_schema,
       };
       const res = await api.scan(payload);
-      setResult(res);
-      setScanContext({
-        target: res.target || target.trim(),
-        auth: auth.trim() || null,
-        // Prefer the schema introspected during the scan; fall back to a
-        // manually pasted one. This gives the exploit agent real field names.
-        graphql_schema: res.schema || graphql_schema,
-      });
+      setSaved(res);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -81,6 +70,18 @@ export default function ScanPanel({ settings }) {
   return (
     <>
       <div className="panel">
+        <label>Report name (optional)</label>
+        <input
+          type="text"
+          placeholder="e.g. Prod API — Q3 assessment"
+          value={reportName}
+          onChange={(e) => setReportName(e.target.value)}
+        />
+        <div className="hint">
+          Results are saved as a named report in the Reports tab. Leave blank to
+          auto-name it after the target.
+        </div>
+
         <label>Target GraphQL endpoint</label>
         <input
           type="text"
@@ -116,22 +117,6 @@ export default function ScanPanel({ settings }) {
           </div>
         </div>
 
-        <label>AI analysis</label>
-        <div className="modules">
-          <label>
-            <input
-              type="checkbox"
-              checked={aiAnalysis}
-              onChange={(e) => setAiAnalysis(e.target.checked)}
-            />
-            Summarise findings with Qwen{qwenModel ? ` (${qwenModel})` : ""}
-          </label>
-        </div>
-        <div className="hint">
-          Runs a local Qwen model over the findings and schema for an executive
-          summary and next steps. Configure the model in the Ollama tab.
-        </div>
-
         <label>Schema JSON (optional — used if introspection is disabled)</label>
         <textarea
           className="code"
@@ -147,9 +132,15 @@ export default function ScanPanel({ settings }) {
         </button>
 
         {error && <div className="error">{error}</div>}
-      </div>
 
-      <Findings result={result} context={scanContext} />
+        {saved && (
+          <div className="status-ok" style={{ marginTop: "1rem" }}>
+            ✓ Scan complete — saved as report{" "}
+            <strong>{saved.name}</strong>. Open the <strong>Reports</strong> tab
+            to view, expand and edit the findings.
+          </div>
+        )}
+      </div>
     </>
   );
 }

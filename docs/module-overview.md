@@ -66,6 +66,9 @@ Aggregates response timing data to establish performance norms, enabling anomaly
 **AI Agent**  
 Transforms vulnerability findings into structured risk insights, executive summaries, and remediation guidance.
 
+**Exploit Agent**  
+Turns a single finding into a verified, non-destructive proof-of-concept. Runs an agentic loop against the live target and emits a self-contained, runnable `exploit.py`. Runs on demand (not part of the deterministic scan order).
+
 ---
 
 ### Execution Support Infrastructure
